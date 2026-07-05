@@ -28,6 +28,7 @@
           <h1>UNCRPD India</h1>
           <span class="subtitle">3D Citation & Research Explorer</span>
         </div>
+        <button class="btn-close-sidebar" id="close-left-btn" title="Collapse Left Menu">◀</button>
       </div>
       
       <!-- Stats Summary Widget -->
@@ -176,7 +177,10 @@
             </div>
             
             <div class="tour-actions">
-              <button class="btn btn-tour-skip" id="tour-exit-btn">Exit Tour</button>
+              <div style="display: flex; gap: 8px; align-items: center;">
+                <button class="btn btn-tour-skip" id="tour-exit-btn">Exit Tour</button>
+                <button class="btn-voice-toggle" id="tour-voice-btn" title="Toggle Voiceover">🔊</button>
+              </div>
               <div class="tour-nav-btns">
                 <button class="btn btn-tour" id="tour-back-btn" disabled>Back</button>
                 <button class="btn btn-tour btn-tour-primary" id="tour-next-btn">Next</button>
@@ -191,7 +195,10 @@
     <!-- Right Contextual Details Inspector Sidebar -->
     <aside class="sidebar-right glass-card" id="sidebar-right">
       <div class="panel-header">
-        <h2>Research Details</h2>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <button class="btn-close-sidebar" id="close-right-btn" title="Collapse Details Menu">▶</button>
+          <h2>Research Details</h2>
+        </div>
         <div class="panel-header-actions" id="panel-header-actions-widget">
           <button class="btn btn-header" id="theme-toggle-btn">☀ Light Mode</button>
           <button class="btn btn-header" id="download-json-btn" title="Download Full JSON Data">Export Data</button>
@@ -251,7 +258,10 @@
         </div>
         
         <div class="tour-actions">
-          <button class="btn btn-tour-skip" id="tut-exit-btn">Skip</button>
+          <div style="display: flex; gap: 8px; align-items: center;">
+            <button class="btn btn-tour-skip" id="tut-exit-btn">Skip</button>
+            <button class="btn-voice-toggle" id="tut-voice-btn" title="Toggle Voiceover">🔊</button>
+          </div>
           <div class="tour-nav-btns">
             <button class="btn btn-tour" id="tut-back-btn" disabled>Back</button>
             <button class="btn btn-tour btn-tour-primary" id="tut-next-btn">Next</button>
@@ -269,6 +279,13 @@
       <div class="image-modal-caption" id="modal-image-caption">Figure Caption</div>
     </div>
   </div>
+
+  <!-- Floating Edge Reopen Buttons -->
+  <button class="floating-reopen-btn hidden" id="reopen-left-btn" title="Expand Left Menu">▶ Navigator</button>
+  <button class="floating-reopen-btn hidden" id="reopen-right-btn" title="Expand Details Menu">◀ Inspector</button>
+
+  <!-- Mobile Sidebar Backdrop Overlay -->
+  <div class="mobile-sidebar-backdrop hidden" id="sidebar-backdrop"></div>
 
   <!-- Load Three.js core library -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>

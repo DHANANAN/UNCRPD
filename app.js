@@ -16,7 +16,12 @@ const state = {
   
   // Interactive Layout Tutorial State
   tutorialActive: false,
-  currentTutorialStep: 0
+  currentTutorialStep: 0,
+
+  // Sidebar Toggling & Sound State
+  leftCollapsed: false,
+  rightCollapsed: false,
+  voiceMuted: localStorage.getItem('uncrpd_voice_muted') === 'true'
 };
 
 // Global Lookup Maps
@@ -38,6 +43,74 @@ function esc(s) {
 function trunc(s, n = 120) {
   s = String(s || '');
   return s.length > n ? s.slice(0, n - 1) + '…' : s;
+}
+
+// Voiceover Speech Engine for Ami Tutorial Guide
+let speechUtterance = null;
+function speakAmi(text) {
+  if (state.voiceMuted) return;
+  if ('speechSynthesis' in window) {
+    window.speechSynthesis.cancel();
+    // Strip HTML tags and markdown symbols before reading
+    const cleanText = text.replace(/<[^>]*>/g, '').replace(/[*#]/g, '').trim();
+    speechUtterance = new SpeechSynthesisUtterance(cleanText);
+    
+    const voices = window.speechSynthesis.getVoices();
+    let voice = voices.find(v => v.name.includes('Google US English') || v.name.includes('Zira') || v.name.includes('Samantha') || v.name.includes('Natural') || v.name.includes('Female'));
+    if (!voice) {
+      voice = voices.find(v => v.lang.startsWith('en'));
+    }
+    if (voice) {
+      speechUtterance.voice = voice;
+    }
+    
+    speechUtterance.pitch = 1.25; // Mascot tone
+    speechUtterance.rate = 1.0;
+    
+    window.speechSynthesis.speak(speechUtterance);
+  }
+}
+
+function updateVoiceMuteUI() {
+  const tourVoiceBtn = document.getElementById('tour-voice-btn');
+  const tutVoiceBtn = document.getElementById('tut-voice-btn');
+  const icon = state.voiceMuted ? '🔇' : '🔊';
+  
+  if (tourVoiceBtn) {
+    tourVoiceBtn.textContent = icon;
+    tourVoiceBtn.classList.toggle('muted', state.voiceMuted);
+  }
+  if (tutVoiceBtn) {
+    tutVoiceBtn.textContent = icon;
+    tutVoiceBtn.classList.toggle('muted', state.voiceMuted);
+  }
+}
+
+function toggleVoiceMute() {
+  state.voiceMuted = !state.voiceMuted;
+  localStorage.setItem('uncrpd_voice_muted', state.voiceMuted);
+  updateVoiceMuteUI();
+  if (state.voiceMuted && 'speechSynthesis' in window) {
+    window.speechSynthesis.cancel();
+  } else if (!state.voiceMuted) {
+    if (state.tourActive) {
+      const step = tourSteps[state.currentTourStep];
+      if (step) speakAmi(step.text);
+    } else if (state.tutorialActive) {
+      const step = helpTutorialSteps[state.currentTutorialStep];
+      if (step) speakAmi(step.text);
+    }
+  }
+}
+
+// Pre-load voices
+if ('speechSynthesis' in window) {
+  window.speechSynthesis.getVoices();
+  if (window.speechSynthesis.onvoiceschanged !== undefined) {
+    window.speechSynthesis.onvoiceschanged = () => {
+      window.speechSynthesis.getVoices();
+    };
+  }
 }
 
 // Index all raw JSON data for quick lookups
@@ -501,30 +574,43 @@ function showArticleDetails(title) {
   const figuresHTML = figures.map(f => getFigureEmbedHTML(f.caption, title)).join('');
   
   inspectorPanel.innerHTML = `
-    <div class="kicker">Article / Section</div>
-    <h2 class="detail-title">${esc(title)}</h2>
-    
-    <div class="chips-container">
-      <span class="badge-chip accent">Points ${a ? a.start : 0}-${a ? a.end : 0}</span>
-      <span class="badge-chip accent">${a ? a.count : 0} Points</span>
-      <span class="badge-chip accent">${a ? a.sourceCount : 0} Citations</span>
+    <div class="bonsai-frame">
+      <div class="kicker">Article / Section</div>
+      <h2 class="detail-title">${esc(title)}</h2>
+      
+      <div class="chips-container">
+        <span class="badge-chip accent">Points ${a ? a.start : 0}-${a ? a.end : 0}</span>
+        <span class="badge-chip accent">${a ? a.count : 0} Points</span>
+        <span class="badge-chip accent">${a ? a.sourceCount : 0} Citations</span>
+      </div>
+      
+      <p class="detail-description">${esc(a?.summary || 'Article section extracted from the UNCRPD India report.')}</p>
     </div>
     
-    <p class="detail-description">${esc(a?.summary || 'Article section extracted from the UNCRPD India report.')}</p>
-    
-    ${figuresHTML ? `<div class="sub-section-header">Visual Infographics (${figures.length})</div>${figuresHTML}` : ''}
-    
-    <div class="sub-section-header">Point Index</div>
-    <div class="inspector-list">
-      ${pts.slice(0, 60).map(p => `
-        <div class="inspector-list-item" onclick="selectPoint(${p.no})">
-          <h5>Point ${p.no}</h5>
-          <p>${esc(trunc(p.title, 140))}</p>
-          <small>${esc(p.subsection || '')}</small>
+    ${figuresHTML ? `
+      <details class="bonsai-accordion">
+        <summary>Visual Infographics (${figures.length})</summary>
+        <div class="accordion-content">
+          ${figuresHTML}
         </div>
-      `).join('')}
-      ${pts.length > 60 ? `<div class="empty-state">Showing first 60 points. Use map search to view other points.</div>` : ''}
-    </div>
+      </details>
+    ` : ''}
+    
+    <details class="bonsai-accordion" open>
+      <summary>Point Index (${pts.length} Paragraphs)</summary>
+      <div class="accordion-content">
+        <div class="inspector-list" style="margin-top: 10px;">
+          ${pts.slice(0, 60).map(p => `
+            <div class="inspector-list-item" onclick="selectPoint(${p.no})">
+              <h5>Point ${p.no}</h5>
+              <p>${esc(trunc(p.title, 140))}</p>
+              <small>${esc(p.subsection || '')}</small>
+            </div>
+          `).join('')}
+          ${pts.length > 60 ? `<div class="empty-state">Showing first 60 points. Use map search to view other points.</div>` : ''}
+        </div>
+      </div>
+    </details>
   `;
 }
 
@@ -532,27 +618,33 @@ function showThemeDetails(theme) {
   const pts = DATA.points.filter(p => p.themes.includes(theme));
   
   inspectorPanel.innerHTML = `
-    <div class="kicker">Cross-cutting Theme</div>
-    <h2 class="detail-title">${esc(theme)}</h2>
-    
-    <div class="chips-container">
-      <span class="badge-chip accent">${pts.length} Linked Points</span>
-      <span class="badge-chip accent">${new Set(pts.map(p => p.article)).size} Connected Chapters</span>
+    <div class="bonsai-frame">
+      <div class="kicker">Cross-cutting Theme</div>
+      <h2 class="detail-title">${esc(theme)}</h2>
+      
+      <div class="chips-container">
+        <span class="badge-chip accent">${pts.length} Linked Points</span>
+        <span class="badge-chip accent">${new Set(pts.map(p => p.article)).size} Connected Chapters</span>
+      </div>
+      
+      <p class="detail-description">This rights theme runs across multiple articles and points in the UNCRPD report. Selecting it displays its full network map.</p>
     </div>
     
-    <p class="detail-description">This rights theme runs across multiple articles and points in the UNCRPD report. Selecting it displays its full network map.</p>
-    
-    <div class="sub-section-header">Linked Numbered Points</div>
-    <div class="inspector-list">
-      ${pts.slice(0, 60).map(p => `
-        <div class="inspector-list-item" onclick="selectPoint(${p.no})">
-          <h5>Point ${p.no}</h5>
-          <p>${esc(trunc(p.title, 140))}</p>
-          <small>${esc(p.article)}</small>
+    <details class="bonsai-accordion" open>
+      <summary>Linked Numbered Points (${pts.length})</summary>
+      <div class="accordion-content">
+        <div class="inspector-list" style="margin-top: 10px;">
+          ${pts.slice(0, 60).map(p => `
+            <div class="inspector-list-item" onclick="selectPoint(${p.no})">
+              <h5>Point ${p.no}</h5>
+              <p>${esc(trunc(p.title, 140))}</p>
+              <small>${esc(p.article)}</small>
+            </div>
+          `).join('')}
+          ${pts.length > 60 ? `<div class="empty-state">Showing first 60 linked points. Use search for exact filter.</div>` : ''}
         </div>
-      `).join('')}
-      ${pts.length > 60 ? `<div class="empty-state">Showing first 60 linked points. Use search for exact filter.</div>` : ''}
-    </div>
+      </div>
+    </details>
   `;
 }
 
@@ -581,34 +673,54 @@ function showPointDetails(no) {
   }).join('');
 
   inspectorPanel.innerHTML = `
-    <div class="kicker">Numbered Paragraph Point</div>
-    <h2 class="detail-title">Point ${p.no}</h2>
-    
-    <div class="chips-container">
-      <span class="badge-chip accent">${esc(p.article)}</span>
-      ${p.subsection ? `<span class="badge-chip accent">${esc(p.subsection)}</span>` : ''}
-      ${p.themes.map(t => `<span class="badge-chip">${esc(t)}</span>`).join('')}
-      <span class="badge-chip accent">${sources.length} Footnote${sources.length !== 1 ? 's' : ''}</span>
+    <div class="bonsai-frame">
+      <div class="kicker">Numbered Paragraph Point</div>
+      <h2 class="detail-title">Point ${p.no}</h2>
+      
+      <div class="chips-container">
+        <span class="badge-chip accent">${esc(p.article)}</span>
+        ${p.subsection ? `<span class="badge-chip accent">${esc(p.subsection)}</span>` : ''}
+        ${p.themes.map(t => `<span class="badge-chip">${esc(t)}</span>`).join('')}
+        <span class="badge-chip accent">${sources.length} Footnote${sources.length !== 1 ? 's' : ''}</span>
+      </div>
+      
+      <div class="bonsai-quote-card">
+        ${esc(p.text)}
+      </div>
     </div>
     
-    <p class="detail-description" style="font-weight:500; font-size:14px; line-height:1.6; border-left:3px solid var(--accent-cyan); padding-left:12px; margin-bottom:20px;">
-      ${esc(p.text)}
-    </p>
-    
-    ${directFigureHTML ? `<div class="sub-section-header">Direct Figure Reference</div>${directFigureHTML}` : ''}
-    
-    ${fallbackFiguresHTML ? `<div class="sub-section-header">Related Chapter Visuals</div><div style="margin-bottom:14px">${fallbackFiguresHTML}</div>` : ''}
-    
-    <div class="sub-section-header">Footnotes & Bibliography</div>
-    <div class="inspector-list">
-      ${sources.length ? sources.map(s => `
-        <div class="inspector-list-item source-item" onclick="showSourceDetails('${s.id}')">
-          <h5>Source Footnote ${s.id}</h5>
-          <p>${esc(s.text)}</p>
-          <small>Type: ${esc(s.type)} · Linked by ${s.points.length} points</small>
+    ${directFigureHTML ? `
+      <details class="bonsai-accordion" open>
+        <summary>Direct Figure Reference</summary>
+        <div class="accordion-content">
+          ${directFigureHTML}
         </div>
-      `).join('') : `<div class="notice" style="padding:10px; font-size:12px; background:rgba(255,255,255,0.02); color:var(--color-muted); border-radius:8px">No direct footnote citation attached to this paragraph.</div>`}
-    </div>
+      </details>
+    ` : ''}
+    
+    ${fallbackFiguresHTML ? `
+      <details class="bonsai-accordion">
+        <summary>Related Chapter Visuals</summary>
+        <div class="accordion-content" style="padding-top: 14px;">
+          <div style="margin-bottom:14px">${fallbackFiguresHTML}</div>
+        </div>
+      </details>
+    ` : ''}
+    
+    <details class="bonsai-accordion" ${sources.length ? 'open' : ''}>
+      <summary>Footnotes & Bibliography (${sources.length})</summary>
+      <div class="accordion-content">
+        <div class="inspector-list" style="margin-top: 10px;">
+          ${sources.length ? sources.map(s => `
+            <div class="inspector-list-item source-item" onclick="showSourceDetails('${s.id}')">
+              <h5>Source Footnote ${s.id}</h5>
+              <p>${esc(s.text)}</p>
+              <small>Type: ${esc(s.type)} · Linked by ${s.points.length} points</small>
+            </div>
+          `).join('') : `<div class="notice" style="padding:10px; font-size:12px; background:rgba(255,255,255,0.02); color:var(--color-muted); border-radius:8px">No direct footnote citation attached to this paragraph.</div>`}
+        </div>
+      </div>
+    </details>
   `;
 }
 
@@ -617,31 +729,37 @@ function showSourceDetails(id) {
   if (!s) return;
   
   inspectorPanel.innerHTML = `
-    <div class="kicker">Citation Footnote Source</div>
-    <h2 class="detail-title">Source ${s.id}</h2>
-    
-    <div class="chips-container">
-      <span class="badge-chip accent">${esc(s.type)}</span>
-      <span class="badge-chip accent">Linked by ${s.points.length} Paragraphs</span>
+    <div class="bonsai-frame">
+      <div class="kicker">Citation Footnote Source</div>
+      <h2 class="detail-title">Source ${s.id}</h2>
+      
+      <div class="chips-container">
+        <span class="badge-chip accent">${esc(s.type)}</span>
+        <span class="badge-chip accent">Linked by ${s.points.length} Paragraphs</span>
+      </div>
+      
+      <div class="bonsai-quote-card" style="border-left-color: var(--accent-pink); background: rgba(255, 121, 198, 0.04);">
+        ${esc(s.text)}
+      </div>
     </div>
     
-    <p class="detail-description" style="font-size:14px; padding:12px; background:rgba(255,121,198,0.06); border:1px solid rgba(255,121,198,0.15); border-radius:10px;">
-      ${esc(s.text)}
-    </p>
-    
-    <div class="sub-section-header">Linked Numbered Points</div>
-    <div class="inspector-list">
-      ${s.points.map(no => {
-        const p = byPoint.get(no);
-        return p ? `
-          <div class="inspector-list-item" onclick="selectPoint(${no})">
-            <h5>Point ${no}</h5>
-            <p>${esc(trunc(p.title, 140))}</p>
-            <small>${esc(p.article)}</small>
-          </div>
-        ` : '';
-      }).join('')}
-    </div>
+    <details class="bonsai-accordion" open>
+      <summary>Linked Numbered Points (${s.points.length})</summary>
+      <div class="accordion-content">
+        <div class="inspector-list" style="margin-top: 10px;">
+          ${s.points.map(no => {
+            const p = byPoint.get(no);
+            return p ? `
+              <div class="inspector-list-item" onclick="selectPoint(${no})">
+                <h5>Point ${no}</h5>
+                <p>${esc(trunc(p.title, 140))}</p>
+                <small>${esc(p.article)}</small>
+              </div>
+            ` : '';
+          }).join('')}
+        </div>
+      </div>
+    </details>
   `;
 }
 
@@ -891,6 +1009,7 @@ function executeTourStep(index) {
   updateMascotAvatar(step.expression, 'mascot-avatar');
   
   step.action();
+  speakAmi(step.text);
   
   document.getElementById('tour-back-btn').disabled = (index === 0);
   const nextBtn = document.getElementById('tour-next-btn');
@@ -917,6 +1036,7 @@ function exitStoryTour() {
   state.tourActive = false;
   document.getElementById('story-tour-overlay').classList.add('hidden');
   if (typeTimer) clearInterval(typeTimer);
+  if ('speechSynthesis' in window) window.speechSynthesis.cancel();
   graph3D.resetView();
   renderDefaultInspector();
 }
@@ -1009,6 +1129,7 @@ function executeHelpStep(index) {
   updateMascotAvatar(step.expression, 'tutorial-mascot');
   
   step.action();
+  speakAmi(step.text);
   
   document.getElementById('tut-back-btn').disabled = (index === 0);
   const nextBtn = document.getElementById('tut-next-btn');
@@ -1030,6 +1151,7 @@ function exitHelpTutorial() {
   state.tutorialActive = false;
   document.getElementById('tutorial-overlay').classList.add('hidden');
   if (tutTypeTimer) clearInterval(tutTypeTimer);
+  if ('speechSynthesis' in window) window.speechSynthesis.cancel();
   document.getElementById('tutorial-spotlight').style.display = 'none';
   graph3D.resetView();
 }
@@ -1109,9 +1231,87 @@ function bindUIEvents() {
     renderDefaultInspector();
   });
   
+  // Sidebar Toggling & Reopen Handle Logic
+  const sidebarLeft = document.getElementById('sidebar-left');
+  const sidebarRight = document.getElementById('sidebar-right');
+  const closeLeftBtn = document.getElementById('close-left-btn');
+  const closeRightBtn = document.getElementById('close-right-btn');
+  const reopenLeftBtn = document.getElementById('reopen-left-btn');
+  const reopenRightBtn = document.getElementById('reopen-right-btn');
+  const sidebarBackdrop = document.getElementById('sidebar-backdrop');
+  
+  function updateSidebarBackdrop() {
+    const isMobileTablet = window.innerWidth <= 1024;
+    const isAnyOpen = !sidebarLeft.classList.contains('collapsed') || !sidebarRight.classList.contains('collapsed');
+    if (isMobileTablet && isAnyOpen) {
+      sidebarBackdrop.classList.remove('hidden');
+    } else {
+      sidebarBackdrop.classList.add('hidden');
+    }
+  }
+
+  function collapseLeft() {
+    sidebarLeft.classList.add('collapsed');
+    reopenLeftBtn.classList.remove('hidden');
+    state.leftCollapsed = true;
+    updateSidebarBackdrop();
+    setTimeout(() => { if (window.graph3D) window.graph3D.resize(); }, 350);
+  }
+
+  function expandLeft() {
+    sidebarLeft.classList.remove('collapsed');
+    reopenLeftBtn.classList.add('hidden');
+    state.leftCollapsed = false;
+    if (window.innerWidth <= 1024) {
+      collapseRight();
+    }
+    updateSidebarBackdrop();
+    setTimeout(() => { if (window.graph3D) window.graph3D.resize(); }, 350);
+  }
+
+  function collapseRight() {
+    sidebarRight.classList.add('collapsed');
+    reopenRightBtn.classList.remove('hidden');
+    state.rightCollapsed = true;
+    updateSidebarBackdrop();
+    setTimeout(() => { if (window.graph3D) window.graph3D.resize(); }, 350);
+  }
+
+  function expandRight() {
+    sidebarRight.classList.remove('collapsed');
+    reopenRightBtn.classList.add('hidden');
+    state.rightCollapsed = false;
+    if (window.innerWidth <= 1024) {
+      collapseLeft();
+    }
+    updateSidebarBackdrop();
+    setTimeout(() => { if (window.graph3D) window.graph3D.resize(); }, 350);
+  }
+
+  closeLeftBtn.addEventListener('click', collapseLeft);
+  reopenLeftBtn.addEventListener('click', expandLeft);
+  closeRightBtn.addEventListener('click', collapseRight);
+  reopenRightBtn.addEventListener('click', expandRight);
+  
   document.getElementById('toggle-right-btn').addEventListener('click', () => {
-    document.getElementById('sidebar-right').classList.toggle('collapsed');
+    if (sidebarRight.classList.contains('collapsed')) {
+      expandRight();
+    } else {
+      collapseRight();
+    }
   });
+
+  sidebarBackdrop.addEventListener('click', () => {
+    collapseLeft();
+    collapseRight();
+  });
+
+  window.addEventListener('resize', updateSidebarBackdrop);
+
+  // Mute Voice toggles
+  document.getElementById('tour-voice-btn').addEventListener('click', toggleVoiceMute);
+  document.getElementById('tut-voice-btn').addEventListener('click', toggleVoiceMute);
+  updateVoiceMuteUI();
   
   // Theme Switching Event Listener (Dark vs. Light mode toggle)
   const themeToggleBtn = document.getElementById('theme-toggle-btn');
