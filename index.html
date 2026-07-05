@@ -64,7 +64,7 @@
       </div>
 
       <!-- Search Box -->
-      <div class="search-box">
+      <div class="search-box" id="search-box-widget">
         <span class="search-icon">🔍</span>
         <input type="text" id="search-input" placeholder="Search points, acts, citations...">
       </div>
@@ -72,7 +72,7 @@
       <!-- Explorer Controls -->
       <div class="section-title">Visual Map Configuration</div>
       
-      <div class="control-group">
+      <div class="control-group" id="view-mode-widget">
         <label class="control-label">View Perspective Mode</label>
         <div class="button-toggle-group">
           <button class="toggle-btn active" data-mode="overview">Overview</button>
@@ -82,14 +82,14 @@
         </div>
       </div>
       
-      <div class="control-group">
+      <div class="control-group" id="filter-select-widget">
         <label class="control-label" for="filter-select">Section Filter</label>
         <select id="filter-select" class="custom-select">
           <option value="">All Report Chapters</option>
         </select>
       </div>
 
-      <div class="control-sliders">
+      <div class="control-sliders" id="sliders-widget">
         <div class="slider-item">
           <div class="slider-header">
             <span>3D Tilt Angle</span>
@@ -121,11 +121,12 @@
       
       <!-- Top floating status pill -->
       <div class="top-pillbar">
-        <div class="pill-badge glass-card">
+        <div class="pill-badge glass-card" id="mode-pill-badge">
           <span class="active-dot"></span>
           <span id="current-mode-label">Interactive Overview Mode</span>
         </div>
-        <div class="pill-actions">
+        <div class="pill-actions" id="top-bar-actions">
+          <button class="btn btn-action" id="help-tutorial-btn">❓ Help Tutorial</button>
           <button class="btn btn-action" id="reset-view-btn">Reset View</button>
           <button class="btn btn-action" id="toggle-right-btn">Toggle Details</button>
         </div>
@@ -191,7 +192,8 @@
     <aside class="sidebar-right glass-card" id="sidebar-right">
       <div class="panel-header">
         <h2>Research Details</h2>
-        <div class="panel-header-actions">
+        <div class="panel-header-actions" id="panel-header-actions-widget">
+          <button class="btn btn-header" id="theme-toggle-btn">☀ Light Mode</button>
           <button class="btn btn-header" id="download-json-btn" title="Download Full JSON Data">Export Data</button>
         </div>
       </div>
@@ -215,6 +217,48 @@
       </div>
     </aside>
     
+  </div>
+
+  <!-- Dedicated Floating Help Tutorial Overlay -->
+  <div class="tutorial-overlay hidden" id="tutorial-overlay">
+    <!-- Spotlight dimming element -->
+    <div class="tutorial-spotlight" id="tutorial-spotlight"></div>
+    
+    <!-- Floating Info Dialog -->
+    <div class="tutorial-card glass-card" id="tutorial-card">
+      <div class="mascot-widget">
+        <div class="mascot-avatar happy" id="tutorial-mascot">
+          <div class="mascot-hair-back"></div>
+          <div class="mascot-face">
+            <div class="mascot-blush"></div>
+            <div class="mascot-eyes">
+              <div class="eye eye-left"><div class="pupil"></div></div>
+              <div class="eye eye-right"><div class="pupil"></div></div>
+            </div>
+            <div class="mascot-mouth"></div>
+          </div>
+          <div class="mascot-hair-front"></div>
+          <div class="mascot-body"></div>
+        </div>
+        <div class="mascot-nametag">Ami · Tutorial</div>
+      </div>
+      
+      <div class="speech-balloon">
+        <div class="tour-chapter-badge" id="tut-step-badge">Help Step 1/5</div>
+        <h4 class="tour-step-title" id="tut-step-title">Dashboard Quick Guide</h4>
+        <div class="tour-step-text" id="tut-step-text">
+          Let me show you how to navigate this dashboard easily!
+        </div>
+        
+        <div class="tour-actions">
+          <button class="btn btn-tour-skip" id="tut-exit-btn">Skip</button>
+          <div class="tour-nav-btns">
+            <button class="btn btn-tour" id="tut-back-btn" disabled>Back</button>
+            <button class="btn btn-tour btn-tour-primary" id="tut-next-btn">Next</button>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- Image Modal Viewer for expanding figures -->

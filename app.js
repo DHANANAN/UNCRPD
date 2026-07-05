@@ -10,9 +10,13 @@ const state = {
   tilt: 55,
   density: 1.0,
   
-  // Guided Tour State
+  // Guided Story Tour State
   tourActive: false,
-  currentTourStep: 0
+  currentTourStep: 0,
+  
+  // Interactive Layout Tutorial State
+  tutorialActive: false,
+  currentTutorialStep: 0
 };
 
 // Global Lookup Maps
@@ -36,7 +40,7 @@ function trunc(s, n = 120) {
   return s.length > n ? s.slice(0, n - 1) + '…' : s;
 }
 
-// Index all raw JSON data for quick O(1) lookups
+// Index all raw JSON data for quick lookups
 function initDataIndexes() {
   DATA.points.forEach(p => byPoint.set(p.no, p));
   DATA.articles.forEach(a => byArticle.set(a.title, a));
@@ -136,7 +140,6 @@ function getThemesLayout() {
     nodes.push(n);
     links.push({ source: 'center', target: n.id, type: 'strong' });
     
-    // Add up to 6 sample points around each theme hub
     const samples = DATA.points
       .filter(p => p.themes.includes(n.theme))
       .slice(0, 6)
@@ -167,7 +170,7 @@ function getSourcesLayout() {
     id: 'center',
     type: 'center',
     label: 'Citation Source Index',
-    meta: `${DATA.sources.length} extracted footnotes & citation notes`,
+    meta: `${DATA.sources.length} footnote/source entries extracted`,
     x: 0, y: 0, z: 80,
     badge: 'Sources'
   };
@@ -195,7 +198,6 @@ function getSourcesLayout() {
     nodes.push(n);
     links.push({ source: 'center', target: n.id, type: 'strong' });
     
-    // Renders up to 14 source nodes in a sub-circle around the type
     const srcs = DATA.sources
       .filter(s => s.type === n.stype)
       .slice(0, 12)
@@ -233,7 +235,6 @@ function getAllPointsLayout() {
   };
   nodes.push(center);
   
-  // Filter points if there's a filter selection (like an article or theme)
   const pts = DATA.points
     .filter(p => !state.filter || p.article === state.filter || p.themes.includes(state.filter))
     .map(p => ({
@@ -252,7 +253,6 @@ function getAllPointsLayout() {
   return { nodes, links };
 }
 
-// Custom layout when a single Article is focused (Expanded view)
 function getArticleLayout(title) {
   const nodes = [];
   const links = [];
@@ -283,7 +283,6 @@ function getArticleLayout(title) {
     links.push({ source: center.id, target: n.id, type: 'normal' });
   });
   
-  // Article sources outer ring
   const srcIds = [...new Set(DATA.points.filter(p => p.article === title).flatMap(p => p.sourceIds))].slice(0, 32);
   const srcNodes = srcIds.map(id => ({
     id: 'source:' + id,
@@ -302,7 +301,6 @@ function getArticleLayout(title) {
   return { nodes, links };
 }
 
-// Custom layout when a single Theme is focused (Expanded view)
 function getThemeLayout(theme) {
   const nodes = [];
   const links = [];
@@ -331,7 +329,6 @@ function getThemeLayout(theme) {
     links.push({ source: center.id, target: n.id, type: 'normal' });
   });
   
-  // Linked articles outer ring
   const articles = [...new Set(linked.map(p => p.article))].map(artTitle => ({
     id: 'article:' + artTitle,
     type: 'article',
@@ -349,7 +346,6 @@ function getThemeLayout(theme) {
   return { nodes, links };
 }
 
-// Custom layout when a single point is focused
 function getPointLayout(no) {
   const nodes = [];
   const links = [];
@@ -367,7 +363,6 @@ function getPointLayout(no) {
   };
   nodes.push(center);
   
-  // Link to parent Article
   const art = {
     id: 'article:' + p.article,
     type: 'article',
@@ -379,7 +374,6 @@ function getPointLayout(no) {
   nodes.push(art);
   links.push({ source: center.id, target: art.id, type: 'strong' });
   
-  // Link to corresponding Themes (surrounding circle)
   const ts = p.themes.map(t => ({
     id: 'theme:' + t,
     type: 'theme',
@@ -392,7 +386,6 @@ function getPointLayout(no) {
     links.push({ source: center.id, target: n.id, type: 'normal' });
   });
   
-  // Link to citation Sources (surrounding circle)
   const srcs = p.sourceIds.map(id => ({
     id: 'source:' + id,
     type: 'source',
@@ -406,7 +399,6 @@ function getPointLayout(no) {
     links.push({ source: center.id, target: n.id, type: 'sourceEdge' });
   });
   
-  // Link to neighbor Points (context sequence)
   const neighbors = DATA.points
     .filter(x => x.article === p.article && Math.abs(x.no - p.no) <= 3 && x.no !== p.no)
     .map(x => ({
@@ -424,7 +416,6 @@ function getPointLayout(no) {
   return { nodes, links };
 }
 
-// Render data based on current state view mode
 function triggerGraphRender() {
   let layout;
   
@@ -438,7 +429,6 @@ function triggerGraphRender() {
     layout = getPointLayout(state.selected.point);
     document.getElementById('current-mode-label').textContent = `Point ${state.selected.point} Citation Web`;
   } else {
-    // Standard Global Modes
     switch (state.mode) {
       case 'themes':
         layout = getThemesLayout();
@@ -484,10 +474,8 @@ function renderDefaultInspector() {
   `;
 }
 
-// Lookup mapped figure files for points/captions
 function getFigureEmbedHTML(caption, sectionName) {
-  // Normalize key lookup
-  const cleanCap = caption.split(':')[0].trim(); // e.g. "Figure 1" or "Table 3"
+  const cleanCap = caption.split(':')[0].trim();
   const imgFile = CAPTION_IMAGE_MAP[cleanCap];
   
   if (!imgFile || imgFile === 'None') return '';
@@ -509,7 +497,6 @@ function showArticleDetails(title) {
   const a = byArticle.get(title);
   const pts = DATA.points.filter(p => p.article === title);
   
-  // Find any figures associated with this article
   const figures = DATA.metadata.figuresAndTables.filter(f => f.section === title);
   const figuresHTML = figures.map(f => getFigureEmbedHTML(f.caption, title)).join('');
   
@@ -575,9 +562,7 @@ function showPointDetails(no) {
   
   const sources = p.sourceIds.map(id => bySource.get(String(id))).filter(Boolean);
   
-  // Let's check if there are figures mentioned or placed in this point's section
   const sectionFigures = DATA.metadata.figuresAndTables.filter(f => f.section === p.article);
-  // Find direct figure/table string matching inside text to display it
   let directFigureHTML = '';
   sectionFigures.forEach(f => {
     const cleanCap = f.caption.split(':')[0].trim();
@@ -586,7 +571,6 @@ function showPointDetails(no) {
     }
   });
   
-  // If no direct figure, but there are section figures, let's offer to load them
   const fallbackFiguresHTML = directFigureHTML ? '' : sectionFigures.map(f => {
     const cleanCap = f.caption.split(':')[0].trim();
     const imgFile = CAPTION_IMAGE_MAP[cleanCap];
@@ -615,7 +599,7 @@ function showPointDetails(no) {
     
     ${fallbackFiguresHTML ? `<div class="sub-section-header">Related Chapter Visuals</div><div style="margin-bottom:14px">${fallbackFiguresHTML}</div>` : ''}
     
-    <div class="sub-section-header">Footnotes & Bibliography Bibliography</div>
+    <div class="sub-section-header">Footnotes & Bibliography</div>
     <div class="inspector-list">
       ${sources.length ? sources.map(s => `
         <div class="inspector-list-item source-item" onclick="showSourceDetails('${s.id}')">
@@ -711,7 +695,6 @@ function handleNodeSelection(nodeData) {
 function populateFilters() {
   const filterSelect = document.getElementById('filter-select');
   
-  // Articles
   DATA.articles.forEach(a => {
     const opt = document.createElement('option');
     opt.value = 'article:' + a.title;
@@ -719,13 +702,11 @@ function populateFilters() {
     filterSelect.appendChild(opt);
   });
   
-  // Separator
   const sep = document.createElement('option');
   sep.disabled = true;
   sep.textContent = '────── Themes ──────';
   filterSelect.appendChild(sep);
   
-  // Themes
   DATA.themes.forEach(t => {
     const opt = document.createElement('option');
     opt.value = 'theme:' + t;
@@ -750,7 +731,6 @@ function initSearch() {
     
     const hits = [];
     
-    // Search Articles
     DATA.articles.forEach(a => {
       if ((a.title + ' ' + a.summary).toLowerCase().includes(q)) {
         hits.push({
@@ -762,7 +742,6 @@ function initSearch() {
       }
     });
     
-    // Search Themes
     DATA.themes.forEach(t => {
       if (t.toLowerCase().includes(q)) {
         hits.push({
@@ -774,7 +753,6 @@ function initSearch() {
       }
     });
     
-    // Search Points
     DATA.points.forEach(p => {
       if ((String(p.no) + ' ' + p.text + ' ' + p.article + ' ' + (p.subsection || '')).toLowerCase().includes(q)) {
         hits.push({
@@ -786,7 +764,6 @@ function initSearch() {
       }
     });
     
-    // Search Sources
     DATA.sources.forEach(s => {
       if ((String(s.id) + ' ' + s.text + ' ' + s.type).toLowerCase().includes(q)) {
         hits.push({
@@ -801,7 +778,6 @@ function initSearch() {
       }
     });
     
-    // Render Hits
     if (!hits.length) {
       resultsList.innerHTML = `<div class="empty-state">No matching case laws, schemes, articles, or citations found.</div>`;
       return;
@@ -820,13 +796,12 @@ function initSearch() {
   });
 }
 
-// Animated Chibi Tour Mascot Configurations
-// We create the list of steps for the interactive tour
+// Guided Story Tour Steps
 const tourSteps = [
   {
     chapter: "Chapter 1/6: Overview Map",
     title: "Ami's UNCRPD Interactive Tour!",
-    text: "Hello! I'm Ami, your rights guide guardian. I'll walk you through the key findings of the UNCRPD report for India. We are starting at the Overview Map showing the 31 articles of the report clustered around the central hub. Click **Next** to proceed!",
+    text: "Hello! I'm Ami, your rights guide guardian. I'll walk you through the key findings of the UNCRPD report for India. We are starting at the Overview Map showing the 31 articles of the report clustered around the central hub. Click Next to proceed!",
     expression: "happy",
     action: () => {
       state.selected = null;
@@ -838,7 +813,7 @@ const tourSteps = [
   {
     chapter: "Chapter 2/6: Demographic Profile",
     title: "Disability Population Split",
-    text: "Let's inspect the demographic data. According to Census 2011, India recorded 26.8 million persons with disabilities (2.21% of the total population). Look at the details panel on the right: it displays **Figure 1** and **Figure 2** which present the disability prevalence by source and rural-urban population split.",
+    text: "Let's inspect the demographic data. According to Census 2011, India recorded 26.8 million persons with disabilities (2.21% of the total population). Look at the details panel on the right: it displays Figure 1 and Figure 2 which present the disability prevalence by source and rural-urban population split.",
     expression: "excited",
     action: () => {
       selectPoint(3);
@@ -847,7 +822,7 @@ const tourSteps = [
   {
     chapter: "Chapter 3/6: Rights Act, 2016",
     title: "Rights of Persons with Disabilities Act",
-    text: "Here we see the primary legislative milestone. The RPwD Act, 2016 came into force on April 19, 2017, aligning Indian domestic law with the UNCRPD. It expanded specified disability categories from 7 to 21, and raised government job reservations to 4%. Check out **Figure 6** for details on these changes!",
+    text: "Here we see the primary legislative milestone. The RPwD Act, 2016 came into force on April 19, 2017, aligning Indian domestic law with the UNCRPD. It expanded specified disability categories from 7 to 21, and raised government job reservations to 4%. Check out Figure 6 for details on these changes!",
     expression: "happy",
     action: () => {
       selectPoint(8);
@@ -856,7 +831,7 @@ const tourSteps = [
   {
     chapter: "Chapter 4/6: Universal Accessibility",
     title: "Accessible India Campaign",
-    text: "Accessibility is vital. Under the Sugamya Bharat Abhiyan (Accessible India Campaign), over 1,600 government buildings, all major railway stations, and 71% of schools have been made barrier-free. You can review the built environment indicators in **Figure 16** and digital accessibility frameworks in **Figure 17**.",
+    text: "Accessibility is vital. Under the Sugamya Bharat Abhiyan (Accessible India Campaign), over 1,600 government buildings, all major railway stations, and 71% of schools have been made barrier-free. You can review the built environment indicators in Figure 16 and digital accessibility frameworks in Figure 17.",
     expression: "excited",
     action: () => {
       selectArticle("Article 9: Accessibility");
@@ -865,7 +840,7 @@ const tourSteps = [
   {
     chapter: "Chapter 5/6: Access to Justice",
     title: "Landmark Judicial Precedents",
-    text: "The Supreme Court has played a critical role in enforcing rights. In *Vikash Kumar*, the Court granted scribes as a reasonable accommodation for non-benchmark disabilities. In *Rajive Raturi*, accessibility was affirmed as integral to the right to life. See **Figure 21** and **Figure 22** for equal recognition maps.",
+    text: "The Supreme Court has played a critical role in enforcing rights. In Vikash Kumar, the Court granted scribes as a reasonable accommodation for non-benchmark disabilities. In Rajive Raturi, accessibility was affirmed as integral to the right to life. See Figure 21 and Figure 22 for equal recognition maps.",
     expression: "thinking",
     action: () => {
       selectPoint(9);
@@ -874,7 +849,7 @@ const tourSteps = [
   {
     chapter: "Chapter 6/6: Inclusive Education",
     title: "Inclusive Education Support",
-    text: "Finally, let's explore Article 24 (Education). The right to education guarantees free, barrier-free schooling for children with disabilities, supported by pupil-teacher ratios and special allowances. Look at the comprehensive inclusive education ecosystem layout shown in **Figure 40** on the right!",
+    text: "Finally, let's explore Article 24 (Education). The right to education guarantees free, barrier-free schooling for children with disabilities, supported by pupil-teacher ratios and special allowances. Look at the comprehensive inclusive education ecosystem layout shown in Figure 40 on the right!",
     expression: "happy",
     action: () => {
       selectArticle("Article 24 - Education");
@@ -883,8 +858,8 @@ const tourSteps = [
 ];
 
 let typeTimer = null;
-function typeSpeechText(text) {
-  const container = document.getElementById('tour-step-text');
+function typeSpeechText(text, targetId = 'tour-step-text') {
+  const container = document.getElementById(targetId);
   if (typeTimer) clearInterval(typeTimer);
   container.textContent = '';
   
@@ -899,9 +874,9 @@ function typeSpeechText(text) {
   }, 14);
 }
 
-function updateMascotAvatar(expression) {
-  const avatar = document.getElementById('mascot-avatar');
-  avatar.className = 'mascot-avatar ' + expression;
+function updateMascotAvatar(expression, avatarId = 'mascot-avatar') {
+  const avatar = document.getElementById(avatarId);
+  if (avatar) avatar.className = 'mascot-avatar ' + expression;
 }
 
 function executeTourStep(index) {
@@ -910,18 +885,13 @@ function executeTourStep(index) {
   
   const step = tourSteps[index];
   
-  // Update texts
   document.getElementById('tour-chapter-badge').textContent = step.chapter;
   document.getElementById('tour-step-title').textContent = step.title;
-  typeSpeechText(step.text);
+  typeSpeechText(step.text, 'tour-step-text');
+  updateMascotAvatar(step.expression, 'mascot-avatar');
   
-  // Update avatar anime styling
-  updateMascotAvatar(step.expression);
-  
-  // Trigger layout navigation
   step.action();
   
-  // Button active controls
   document.getElementById('tour-back-btn').disabled = (index === 0);
   const nextBtn = document.getElementById('tour-next-btn');
   if (index === tourSteps.length - 1) {
@@ -930,14 +900,14 @@ function executeTourStep(index) {
     nextBtn.textContent = 'Next';
   }
   
-  // Trigger speedlines burst effect for chapter transitions
   const speedlines = document.getElementById('tour-speedlines');
   speedlines.style.animation = 'none';
-  void speedlines.offsetWidth; // Trigger reflow
+  void speedlines.offsetWidth;
   speedlines.style.animation = 'speedlines-spin 25s linear infinite';
 }
 
 function startStoryTour() {
+  if (state.tutorialActive) exitHelpTutorial();
   state.tourActive = true;
   document.getElementById('story-tour-overlay').classList.remove('hidden');
   executeTourStep(0);
@@ -949,6 +919,119 @@ function exitStoryTour() {
   if (typeTimer) clearInterval(typeTimer);
   graph3D.resetView();
   renderDefaultInspector();
+}
+
+// DEDICATED HELP TUTORIAL WIDGET
+const helpTutorialSteps = [
+  {
+    badge: "Step 1/5: Interactive 3D Map",
+    title: "Control the 3D Mind Map",
+    text: "This central workspace renders the report nodes in WebGL. Left-click drag to rotate the network; scroll your mouse wheel to zoom in and out. Click any node to focus the camera and view its details!",
+    targetId: "threejs-wrapper",
+    expression: "happy",
+    action: () => {
+      graph3D.resetView();
+    }
+  },
+  {
+    badge: "Step 2/5: Graph Configuration",
+    title: "Toggle Perspectives & Filters",
+    text: "Use these toggles to switch between Overview clusters, cross-cutting Themes, citation Sources, or All Points. You can also filter by a specific chapter using the dropdown, or adjust tilt angles and node spacing with these sliders!",
+    targetId: "view-mode-widget",
+    expression: "excited",
+    action: () => {}
+  },
+  {
+    badge: "Step 3/5: Real-time Search",
+    title: "Locate Case Laws & Schemes",
+    text: "Type acts, case names (like 'Vikash Kumar'), or key terms here. Search results appear instantly in a list below: clicking any item focuses the 3D node and loads its full text!",
+    targetId: "search-box-widget",
+    expression: "happy",
+    action: () => {}
+  },
+  {
+    badge: "Step 4/5: Contextual Details",
+    title: "Read Detailed Text & Visuals",
+    text: "When you select a node, its details load here. Scroll down to read the full body paragraph text, check footnotes, or view embedded visual infographics! Click any image preview to expand it to fullscreen.",
+    targetId: "sidebar-right",
+    expression: "excited",
+    action: () => {}
+  },
+  {
+    badge: "Step 5/5: Light / Dark Toggle",
+    title: "Warm Sepia Graph Paper",
+    text: "Designed with comfort in mind: click this button to switch between the cosmic dark mode and the warm gold-sand graph paper light mode!",
+    targetId: "theme-toggle-btn",
+    expression: "happy",
+    action: () => {}
+  }
+];
+
+let tutTypeTimer = null;
+function executeHelpStep(index) {
+  if (index < 0 || index >= helpTutorialSteps.length) return;
+  state.currentTutorialStep = index;
+  
+  const step = helpTutorialSteps[index];
+  
+  // Highlight targeted element with spotlight backdrop cutout
+  const target = document.getElementById(step.targetId);
+  const spotlight = document.getElementById('tutorial-spotlight');
+  if (target) {
+    const rect = target.getBoundingClientRect();
+    spotlight.style.left = `${rect.left - 8}px`;
+    spotlight.style.top = `${rect.top - 8}px`;
+    spotlight.style.width = `${rect.width + 16}px`;
+    spotlight.style.height = `${rect.height + 16}px`;
+    // spotlight is display: block
+    spotlight.style.display = 'block';
+  } else {
+    spotlight.style.display = 'none';
+  }
+  
+  document.getElementById('tut-step-badge').textContent = step.badge;
+  document.getElementById('tut-step-title').textContent = step.title;
+  
+  // Typewriter speech bubbles
+  const textEl = document.getElementById('tut-step-text');
+  if (tutTypeTimer) clearInterval(tutTypeTimer);
+  textEl.textContent = '';
+  let i = 0;
+  tutTypeTimer = setInterval(() => {
+    if (i < step.text.length) {
+      textEl.textContent += step.text[i];
+      i++;
+    } else {
+      clearInterval(tutTypeTimer);
+    }
+  }, 14);
+  
+  updateMascotAvatar(step.expression, 'tutorial-mascot');
+  
+  step.action();
+  
+  document.getElementById('tut-back-btn').disabled = (index === 0);
+  const nextBtn = document.getElementById('tut-next-btn');
+  if (index === helpTutorialSteps.length - 1) {
+    nextBtn.textContent = 'Finish';
+  } else {
+    nextBtn.textContent = 'Next';
+  }
+}
+
+function startHelpTutorial() {
+  if (state.tourActive) exitStoryTour();
+  state.tutorialActive = true;
+  document.getElementById('tutorial-overlay').classList.remove('hidden');
+  executeHelpStep(0);
+}
+
+function exitHelpTutorial() {
+  state.tutorialActive = false;
+  document.getElementById('tutorial-overlay').classList.add('hidden');
+  if (tutTypeTimer) clearInterval(tutTypeTimer);
+  document.getElementById('tutorial-spotlight').style.display = 'none';
+  graph3D.resetView();
 }
 
 // Fullscreen Image Modal Expanded Viewer
@@ -969,13 +1052,11 @@ function closeImageModal() {
 
 // Binds all DOM elements and UI triggers
 function bindUIEvents() {
-  // Stats
   document.getElementById('stat-points').textContent = DATA.metadata.realExtractedPoints || DATA.metadata.pointsTotal;
   document.getElementById('stat-citations').textContent = DATA.metadata.sourcesTotal;
   document.getElementById('stat-articles').textContent = DATA.metadata.articlesTotal;
   document.getElementById('stat-themes').textContent = DATA.themes.length;
   
-  // Graph view modes toggle buttons
   document.querySelectorAll('[data-mode]').forEach(b => {
     b.addEventListener('click', () => {
       document.querySelectorAll('[data-mode]').forEach(x => x.classList.remove('active'));
@@ -988,7 +1069,6 @@ function bindUIEvents() {
     });
   });
   
-  // Dropdown filter change
   const filterSelect = document.getElementById('filter-select');
   filterSelect.addEventListener('change', () => {
     const val = filterSelect.value;
@@ -1008,7 +1088,6 @@ function bindUIEvents() {
     }
   });
   
-  // Custom Tilt slider
   const sliderTilt = document.getElementById('slider-tilt');
   sliderTilt.addEventListener('input', (e) => {
     const val = parseInt(e.target.value);
@@ -1016,7 +1095,6 @@ function bindUIEvents() {
     graph3D.setTilt(val);
   });
   
-  // Custom Density slider
   const sliderDensity = document.getElementById('slider-density');
   sliderDensity.addEventListener('input', (e) => {
     const val = parseInt(e.target.value);
@@ -1024,7 +1102,6 @@ function bindUIEvents() {
     graph3D.setDensity(val / 100);
   });
   
-  // General Action buttons
   document.getElementById('reset-view-btn').addEventListener('click', () => {
     graph3D.resetView();
     state.selected = null;
@@ -1036,7 +1113,21 @@ function bindUIEvents() {
     document.getElementById('sidebar-right').classList.toggle('collapsed');
   });
   
-  // Mascot guided tour buttons
+  // Theme Switching Event Listener (Dark vs. Light mode toggle)
+  const themeToggleBtn = document.getElementById('theme-toggle-btn');
+  themeToggleBtn.addEventListener('click', () => {
+    const isLight = document.body.classList.toggle('light-theme');
+    const newTheme = isLight ? 'light' : 'dark';
+    themeToggleBtn.textContent = isLight ? '🌙 Dark Mode' : '☀ Light Mode';
+    graph3D.setTheme(newTheme);
+    
+    // Reposition spotlights if tutorial is active to recalculate backdrop alpha
+    if (state.tutorialActive) {
+      executeHelpStep(state.currentTutorialStep);
+    }
+  });
+  
+  // Story Tour Button actions
   document.getElementById('start-tour-btn').addEventListener('click', startStoryTour);
   document.getElementById('tour-exit-btn').addEventListener('click', exitStoryTour);
   document.getElementById('tour-back-btn').addEventListener('click', () => {
@@ -1049,6 +1140,22 @@ function bindUIEvents() {
       executeTourStep(state.currentTourStep + 1);
     } else {
       exitStoryTour();
+    }
+  });
+  
+  // Help Tutorial Button actions
+  document.getElementById('help-tutorial-btn').addEventListener('click', startHelpTutorial);
+  document.getElementById('tut-exit-btn').addEventListener('click', exitHelpTutorial);
+  document.getElementById('tut-back-btn').addEventListener('click', () => {
+    if (state.currentTutorialStep > 0) {
+      executeHelpStep(state.currentTutorialStep - 1);
+    }
+  });
+  document.getElementById('tut-next-btn').addEventListener('click', () => {
+    if (state.currentTutorialStep < helpTutorialSteps.length - 1) {
+      executeHelpStep(state.currentTutorialStep + 1);
+    } else {
+      exitHelpTutorial();
     }
   });
   
@@ -1075,7 +1182,6 @@ window.addEventListener('DOMContentLoaded', () => {
   populateFilters();
   bindUIEvents();
   
-  // Initialize WebGL Graph
   window.graph3D = new UNCRPDGraph3D(
     'threejs-canvas',
     'threejs-wrapper',

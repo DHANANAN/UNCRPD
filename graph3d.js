@@ -10,6 +10,8 @@ class UNCRPDGraph3D {
     this.nodeMeshes = new Map();
     this.linkLabelMeshes = [];
     
+    this.theme = 'dark'; // Active theme state: 'dark' or 'light'
+    
     // Animation targets for smooth interpolation (Tweens)
     this.cameraTarget = new THREE.Vector3(0, 0, 450);
     this.cameraCurrent = new THREE.Vector3(0, 0, 700);
@@ -65,7 +67,7 @@ class UNCRPDGraph3D {
     this.scene.add(this.graphGroup);
     
     // Add Lighting
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.2);
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.25);
     this.scene.add(ambientLight);
     
     this.dirLight1 = new THREE.DirectionalLight(0x00f0ff, 0.8);
@@ -97,6 +99,7 @@ class UNCRPDGraph3D {
   }
   
   createStarsBackground() {
+    const isLight = this.theme === 'light';
     const starsCount = 400;
     const geometry = new THREE.BufferGeometry();
     const positions = new Float32Array(starsCount * 3);
@@ -112,14 +115,25 @@ class UNCRPDGraph3D {
       positions[i + 1] = r * Math.sin(phi) * Math.sin(theta);
       positions[i + 2] = r * Math.cos(phi);
       
-      // Color: cyan, purple, or white sparkles
-      const rand = Math.random();
-      if (rand < 0.4) {
-        colors[i] = 0.0; colors[i + 1] = 0.94; colors[i + 2] = 1.0; // Cyan
-      } else if (rand < 0.8) {
-        colors[i] = 0.74; colors[i + 1] = 0.57; colors[i + 2] = 0.97; // Purple
+      // Color adjustments for light/dark mode
+      if (isLight) {
+        // Light theme: soft sand/gold and sepia sparks
+        const rand = Math.random();
+        if (rand < 0.5) {
+          colors[i] = 0.77; colors[i + 1] = 0.58; colors[i + 2] = 0.23; // Golden Gold
+        } else {
+          colors[i] = 0.45; colors[i + 1] = 0.38; colors[i + 2] = 0.31; // Soft sepia brown
+        }
       } else {
-        colors[i] = 1.0; colors[i + 1] = 1.0; colors[i + 2] = 1.0; // White
+        // Dark theme: cyan, purple, or white sparkles
+        const rand = Math.random();
+        if (rand < 0.4) {
+          colors[i] = 0.0; colors[i + 1] = 0.94; colors[i + 2] = 1.0; // Cyan
+        } else if (rand < 0.8) {
+          colors[i] = 0.74; colors[i + 1] = 0.57; colors[i + 2] = 0.97; // Purple
+        } else {
+          colors[i] = 1.0; colors[i + 1] = 1.0; colors[i + 2] = 1.0; // White
+        }
       }
     }
     
@@ -128,11 +142,11 @@ class UNCRPDGraph3D {
     
     // Material using circular point textures
     const material = new THREE.PointsMaterial({
-      size: 3.5,
+      size: isLight ? 4.5 : 3.5,
       vertexColors: true,
       transparent: true,
-      opacity: 0.6,
-      blending: THREE.AdditiveBlending,
+      opacity: isLight ? 0.45 : 0.6,
+      blending: THREE.NormalBlending,
       sizeAttenuation: true
     });
     
@@ -150,7 +164,6 @@ class UNCRPDGraph3D {
     
     this.canvas.addEventListener('pointermove', (e) => {
       if (!this.isDragging) {
-        // Track hover for raycasting
         this.updateMouseCoords(e);
         this.checkHover();
         return;
@@ -159,7 +172,6 @@ class UNCRPDGraph3D {
       const deltaX = e.clientX - this.previousMousePosition.x;
       const deltaY = e.clientY - this.previousMousePosition.y;
       
-      // Rotate target
       this.worldRotationTarget.y += deltaX * 0.004;
       this.worldRotationTarget.x += deltaY * 0.004;
       
@@ -173,7 +185,6 @@ class UNCRPDGraph3D {
       this.isDragging = false;
       this.canvas.releasePointerCapture(e.pointerId);
       
-      // If it was a quick click, perform raycasting check
       const deltaX = Math.abs(e.clientX - this.previousMousePosition.x);
       const deltaY = Math.abs(e.clientY - this.previousMousePosition.y);
       if (deltaX < 3 && deltaY < 3) {
@@ -188,7 +199,6 @@ class UNCRPDGraph3D {
       this.zoomTarget = Math.max(0.3, Math.min(2.5, this.zoomTarget * zoomAmount));
     }, { passive: false });
     
-    // Resize handler
     window.addEventListener('resize', () => this.resize());
   }
   
@@ -222,6 +232,36 @@ class UNCRPDGraph3D {
     this.worldRotationTarget.x = rad;
   }
   
+  setTheme(themeName) {
+    this.theme = themeName;
+    const isLight = themeName === 'light';
+    
+    // 1. Update clear color and fog matching light sepia grid paper
+    const bgColor = isLight ? 0xfaf4e3 : 0x02060b;
+    this.renderer.setClearColor(bgColor, 1);
+    this.scene.fog.color.setHex(bgColor);
+    
+    // 2. Update directional lighting colors for sepia/warm gold tone contrast
+    if (isLight) {
+      this.dirLight1.color.setHex(0xb37d14);
+      this.dirLight2.color.setHex(0x7a3ebb);
+    } else {
+      this.dirLight1.color.setHex(0x00f0ff);
+      this.dirLight2.color.setHex(0xbd93f9);
+    }
+    
+    // 3. Dispose and recreate star background for theme mapping
+    if (this.stars) {
+      this.scene.remove(this.stars);
+      this.stars.geometry.dispose();
+      this.stars.material.dispose();
+    }
+    this.createStarsBackground();
+    
+    // 4. Rebuild all materials and meshes
+    this.buildGraph();
+  }
+  
   buildGraph() {
     // Clear previous geometries
     while(this.graphGroup.children.length > 0) {
@@ -237,6 +277,8 @@ class UNCRPDGraph3D {
     this.nodeMeshes.clear();
     this.laserParticles = [];
     
+    const isLight = this.theme === 'light';
+    
     // Pre-create basic geometries
     const sphereGeom = new THREE.SphereGeometry(1, 16, 12);
     const starGeom = new THREE.IcosahedronGeometry(1, 1);
@@ -245,34 +287,34 @@ class UNCRPDGraph3D {
     this.nodes.forEach(node => {
       let size = 3;
       let color = 0xbd93f9;
-      let emissive = 0x221133;
+      let emissive = 0x110022;
       let geom = sphereGeom;
       
       switch (node.type) {
         case 'article':
         case 'article center':
           size = 7.5;
-          color = 0x00f0ff;
-          emissive = 0x002244;
+          color = isLight ? 0xc4943c : 0x00f0ff;
+          emissive = isLight ? 0x3d2805 : 0x002244;
           break;
         case 'theme':
         case 'theme center':
           size = 6.0;
-          color = 0xffb86c;
-          emissive = 0x331e00;
+          color = isLight ? 0xb37d14 : 0xffb86c;
+          emissive = isLight ? 0x221300 : 0x331e00;
           geom = starGeom;
           break;
         case 'source':
           size = 3.5;
-          color = 0xff79c6;
-          emissive = 0x33001e;
+          color = isLight ? 0xd81b60 : 0xff79c6;
+          emissive = isLight ? 0x33000a : 0x33001e;
           break;
         case 'point':
         case 'point center':
         default:
           size = 2.8;
-          color = 0xbd93f9;
-          emissive = 0x110022;
+          color = isLight ? 0x7a3ebb : 0xbd93f9;
+          emissive = isLight ? 0x0d001a : 0x110022;
           break;
       }
       
@@ -296,24 +338,24 @@ class UNCRPDGraph3D {
     
     // 2. Render Connection Lines
     const lineMaterial = new THREE.LineBasicMaterial({
-      color: 0x486480,
+      color: isLight ? 0x9c8f80 : 0x486480,
       transparent: true,
-      opacity: 0.35,
-      blending: THREE.AdditiveBlending
+      opacity: isLight ? 0.55 : 0.35,
+      blending: isLight ? THREE.NormalBlending : THREE.AdditiveBlending
     });
     
     const strongLineMaterial = new THREE.LineBasicMaterial({
-      color: 0x00f0ff,
+      color: isLight ? 0xc4943c : 0x00f0ff,
       transparent: true,
-      opacity: 0.65,
-      blending: THREE.AdditiveBlending
+      opacity: isLight ? 0.8 : 0.65,
+      blending: isLight ? THREE.NormalBlending : THREE.AdditiveBlending
     });
     
     const dashedMaterial = new THREE.LineBasicMaterial({
-      color: 0xff79c6,
+      color: isLight ? 0xd81b60 : 0xff79c6,
       transparent: true,
-      opacity: 0.45,
-      blending: THREE.AdditiveBlending
+      opacity: isLight ? 0.6 : 0.45,
+      blending: isLight ? THREE.NormalBlending : THREE.AdditiveBlending
     });
     
     this.links.forEach(link => {
@@ -341,15 +383,17 @@ class UNCRPDGraph3D {
   }
   
   createLaserParticle(start, end, linkType) {
-    let color = 0x00f0ff;
-    if (linkType === 'sourceEdge') color = 0xff79c6;
-    if (linkType === 'strong') color = 0xffb86c;
+    const isLight = this.theme === 'light';
+    
+    let color = isLight ? 0xc4943c : 0x00f0ff;
+    if (linkType === 'sourceEdge') color = isLight ? 0xd81b60 : 0xff79c6;
+    if (linkType === 'strong') color = isLight ? 0xb37d14 : 0xffb86c;
     
     this.laserParticles.push({
       start: start.clone(),
       end: end.clone(),
       position: start.clone(),
-      t: Math.random(), // Distributed offset
+      t: Math.random(),
       speed: 0.006 + Math.random() * 0.01,
       color: color
     });
@@ -362,14 +406,7 @@ class UNCRPDGraph3D {
         mesh.position.set(node.x * this.densityScale, node.y * this.densityScale, (node.z || 0) * this.densityScale);
       }
     });
-    
-    // Update lines geometry
-    this.graphGroup.children.forEach(child => {
-      if (child instanceof THREE.Line) {
-        const fromId = child.parent ? null : null; // lines are drawn statically, we rebuild graph for absolute changes
-      }
-    });
-    this.buildGraph(); // Simplest robust update
+    this.buildGraph(); // Update connection coordinates
   }
   
   buildHTMLLabels() {
@@ -377,12 +414,10 @@ class UNCRPDGraph3D {
     this.linkLabelMeshes = [];
     
     this.nodes.forEach(node => {
-      // Create HTML node marker
       const el = document.createElement('div');
       el.className = `node-label-anchor node-${node.type.replace(' center', '')}`;
       el.dataset.id = node.id;
       
-      // Label inner content
       let name = node.label;
       if (typeof name === 'string' && name.length > 20) {
         name = name.substring(0, 18) + '...';
@@ -395,7 +430,6 @@ class UNCRPDGraph3D {
         </div>
       `;
       
-      // Make it clickable via pointer events on wrapper
       el.style.position = 'absolute';
       el.style.transform = 'translate(-50%, -50%)';
       el.style.pointerEvents = 'auto';
@@ -416,7 +450,6 @@ class UNCRPDGraph3D {
   
   checkHover() {
     this.raycaster.setFromCamera(this.mouse, this.camera);
-    // Raycast only on children of graphGroup that are meshes
     const meshes = Array.from(this.nodeMeshes.values());
     const intersects = this.raycaster.intersectObjects(meshes);
     
@@ -454,20 +487,16 @@ class UNCRPDGraph3D {
     if (this.selectedNodeId === nodeId) return;
     this.selectedNodeId = nodeId;
     
-    // Highlight HTML elements
     document.querySelectorAll('.node-label-anchor').forEach(el => {
       el.classList.toggle('selected', el.dataset.id === nodeId);
     });
     
-    // Focus camera onto the selected node mesh
     const mesh = this.nodeMeshes.get(nodeId);
     if (mesh) {
       const pos = mesh.position;
       
-      // Update pan targets to center this node
       this.panTarget.copy(pos).multiplyScalar(-1);
       
-      // Adjust camera distance depending on node type
       let zoomDist = 200;
       if (mesh.userData.nodeData.type.includes('article')) zoomDist = 320;
       if (mesh.userData.nodeData.type.includes('theme')) zoomDist = 260;
@@ -475,7 +504,6 @@ class UNCRPDGraph3D {
       this.zoomTarget = 1.3;
       this.cameraTarget.set(0, 0, zoomDist);
       
-      // Trigger callback
       if (this.onNodeSelected) {
         this.onNodeSelected(mesh.userData.nodeData);
       }
@@ -506,20 +534,14 @@ class UNCRPDGraph3D {
     
     this.linkLabelMeshes.forEach(item => {
       tempV.copy(item.position);
-      
-      // Apply world Group rotations and pans first
       tempV.applyMatrix4(this.graphGroup.matrixWorld);
-      
-      // Project into screen space
       tempV.project(this.camera);
       
-      // Check if node is behind camera view clip pane
       if (tempV.z > 1) {
         item.element.style.display = 'none';
         return;
       }
       
-      // Map back to absolute pixel offsets
       const x = (tempV.x * widthHalf) + widthHalf;
       const y = -(tempV.y * heightHalf) + heightHalf;
       
@@ -527,11 +549,9 @@ class UNCRPDGraph3D {
       item.element.style.left = `${x}px`;
       item.element.style.top = `${y}px`;
       
-      // Set z-index based on depth coordinate
       const zIndex = Math.round((1 - tempV.z) * 1000);
       item.element.style.zIndex = `${zIndex}`;
       
-      // Apply scaling based on distance to feel realistic 3D
       const scale = Math.max(0.65, Math.min(1.15, 1 - (tempV.z * 0.5)));
       item.element.style.transform = `translate(-50%, -50%) scale(${scale})`;
       item.element.style.opacity = Math.max(0.2, 1.2 - tempV.z);
@@ -541,7 +561,6 @@ class UNCRPDGraph3D {
   animate() {
     requestAnimationFrame(() => this.animate());
     
-    // 1. Interpolate rotations & pans smoothly (Lerps)
     this.worldRotationCurrent.x += (this.worldRotationTarget.x - this.worldRotationCurrent.x) * 0.08;
     this.worldRotationCurrent.y += (this.worldRotationTarget.y - this.worldRotationCurrent.y) * 0.08;
     
@@ -557,25 +576,18 @@ class UNCRPDGraph3D {
     this.camera.position.copy(this.cameraCurrent).multiplyScalar(1 / this.zoomCurrent);
     this.camera.lookAt(0, 0, 0);
     
-    // Rotate background dust slowly
     if (this.stars) {
       this.stars.rotation.y += 0.0003;
       this.stars.rotation.x += 0.0001;
     }
     
-    // 2. Animate Laser Particles
     this.animateLasers();
     
-    // Render WebGL frame
     this.renderer.render(this.scene, this.camera);
-    
-    // 3. Update position of HTML overlays on screen
     this.updateProjectedLabels();
   }
   
   animateLasers() {
-    // We will render laser particles as dynamic tiny spheres in our scene
-    // First, clear any temporary particle meshes from last frame
     if (this.particleMeshes) {
       this.particleMeshes.forEach(pm => this.graphGroup.remove(pm));
     }
@@ -586,13 +598,11 @@ class UNCRPDGraph3D {
     this.laserParticles.forEach(lp => {
       lp.t += lp.speed;
       if (lp.t >= 1) {
-        lp.t = 0; // Loop back
+        lp.t = 0;
       }
       
-      // Interpolate position
       lp.position.lerpVectors(lp.start, lp.end, lp.t);
       
-      // Render particle
       const mat = new THREE.MeshBasicMaterial({
         color: lp.color,
         transparent: true,
@@ -601,7 +611,6 @@ class UNCRPDGraph3D {
       });
       
       const mesh = new THREE.Mesh(geom, mat);
-      // reposition with density scale
       mesh.position.copy(lp.position).multiplyScalar(this.densityScale);
       
       this.graphGroup.add(mesh);
