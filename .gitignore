@@ -1,0 +1,10 @@
+# Editor and System files
+.DS_Store
+Thumbs.db
+*.tmp
+*.log
+.vscode/
+.idea/
+
+# Git mapping folders
+.git/

@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>India UNCRPD 3D Research Citation Map & Story Dashboard</title>
+  <meta name="description" content="An interactive 3D WebGL mind map and animated story tour of the India UNCRPD state report, mapping numbered points, legal milestones, and citation networks.">
+  
+  <!-- Premium Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <!-- Main Stylesheet -->
+  <link rel="stylesheet" href="app.css">
+</head>
+<body>
+  
+  <div class="app-container">
+    
+    <!-- Left Navigation & Controls Sidebar -->
+    <aside class="sidebar-left glass-card" id="sidebar-left">
+      <div class="brand">
+        <div class="brand-logo">
+          <div class="logo-inner"></div>
+        </div>
+        <div class="brand-text">
+          <h1>UNCRPD India</h1>
+          <span class="subtitle">3D Citation & Research Explorer</span>
+        </div>
+      </div>
+      
+      <!-- Stats Summary Widget -->
+      <div class="stats-grid" id="stats-widget">
+        <div class="stat-card">
+          <span class="stat-val" id="stat-points">0</span>
+          <span class="stat-label">Report Points</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-val" id="stat-citations">0</span>
+          <span class="stat-label">Citations</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-val" id="stat-articles">0</span>
+          <span class="stat-label">Articles</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-val" id="stat-themes">0</span>
+          <span class="stat-label">Thematic Hubs</span>
+        </div>
+      </div>
+      
+      <!-- Anime Story Tour Banner Trigger -->
+      <div class="tour-banner" id="start-tour-banner">
+        <div class="banner-glow"></div>
+        <div class="banner-content">
+          <h3>Explore with Ami!</h3>
+          <p>Embark on an anime-style animated guided tour of the report milestones.</p>
+          <button class="btn btn-primary btn-glow" id="start-tour-btn">
+            <span>Start Story Tour</span>
+            <svg class="icon-play" viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Search Box -->
+      <div class="search-box">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="search-input" placeholder="Search points, acts, citations...">
+      </div>
+
+      <!-- Explorer Controls -->
+      <div class="section-title">Visual Map Configuration</div>
+      
+      <div class="control-group">
+        <label class="control-label">View Perspective Mode</label>
+        <div class="button-toggle-group">
+          <button class="toggle-btn active" data-mode="overview">Overview</button>
+          <button class="toggle-btn" data-mode="themes">Themes</button>
+          <button class="toggle-btn" data-mode="sources">Sources</button>
+          <button class="toggle-btn" data-mode="allpoints">All Points</button>
+        </div>
+      </div>
+      
+      <div class="control-group">
+        <label class="control-label" for="filter-select">Section Filter</label>
+        <select id="filter-select" class="custom-select">
+          <option value="">All Report Chapters</option>
+        </select>
+      </div>
+
+      <div class="control-sliders">
+        <div class="slider-item">
+          <div class="slider-header">
+            <span>3D Tilt Angle</span>
+            <span id="slider-tilt-val">55°</span>
+          </div>
+          <input type="range" id="slider-tilt" min="15" max="85" value="55" class="custom-slider">
+        </div>
+        <div class="slider-item">
+          <div class="slider-header">
+            <span>Node Clustering</span>
+            <span id="slider-density-val">100%</span>
+          </div>
+          <input type="range" id="slider-density" min="60" max="150" value="100" class="custom-slider">
+        </div>
+      </div>
+
+      <div class="section-title">Search Results</div>
+      <div class="results-container" id="search-results-list">
+        <div class="empty-state">Search query matching keywords will display hits here.</div>
+      </div>
+      
+      <div class="sidebar-footer">
+        <span>Click nodes to zoom. Drag workspace to rotate 3D graph.</span>
+      </div>
+    </aside>
+    
+    <!-- Central WebGL Viewport -->
+    <main class="viewport-container" id="viewport-container">
+      
+      <!-- Top floating status pill -->
+      <div class="top-pillbar">
+        <div class="pill-badge glass-card">
+          <span class="active-dot"></span>
+          <span id="current-mode-label">Interactive Overview Mode</span>
+        </div>
+        <div class="pill-actions">
+          <button class="btn btn-action" id="reset-view-btn">Reset View</button>
+          <button class="btn btn-action" id="toggle-right-btn">Toggle Details</button>
+        </div>
+      </div>
+      
+      <!-- Three.js Canvas -->
+      <div class="threejs-wrapper" id="threejs-wrapper">
+        <canvas id="threejs-canvas"></canvas>
+      </div>
+      
+      <!-- Anime Story Tour Character Overlay & Dialog Balloon -->
+      <div class="anime-story-tour-overlay hidden" id="story-tour-overlay">
+        <!-- Background Speedlines for Anime styling -->
+        <div class="anime-speedlines" id="tour-speedlines"></div>
+        
+        <!-- Story Card Panel -->
+        <div class="story-dialog-box glass-card">
+          <!-- Mascot Character Widget -->
+          <div class="mascot-widget">
+            <div class="mascot-avatar" id="mascot-avatar">
+              <!-- Expressive Anime-style SVG Avatar -->
+              <div class="mascot-hair-back"></div>
+              <div class="mascot-face">
+                <div class="mascot-blush"></div>
+                <div class="mascot-eyes">
+                  <div class="eye eye-left">
+                    <div class="pupil"></div>
+                  </div>
+                  <div class="eye eye-right">
+                    <div class="pupil"></div>
+                  </div>
+                </div>
+                <div class="mascot-mouth"></div>
+              </div>
+              <div class="mascot-hair-front"></div>
+              <div class="mascot-body"></div>
+            </div>
+            <div class="mascot-nametag">Ami · Guide</div>
+          </div>
+          
+          <!-- Speech / Explanation Balloon -->
+          <div class="speech-balloon">
+            <div class="tour-chapter-badge" id="tour-chapter-badge">Chapter 1/5: Introduction</div>
+            <h4 class="tour-step-title" id="tour-step-title">Welcome to the UNCRPD Explorer!</h4>
+            <div class="tour-step-text" id="tour-step-text">
+              Let's walk through the report together! I'll guide you through the demographic structure, accessibility outputs, inclusive education milestones, and the landmark legal case decisions.
+            </div>
+            
+            <div class="tour-actions">
+              <button class="btn btn-tour-skip" id="tour-exit-btn">Exit Tour</button>
+              <div class="tour-nav-btns">
+                <button class="btn btn-tour" id="tour-back-btn" disabled>Back</button>
+                <button class="btn btn-tour btn-tour-primary" id="tour-next-btn">Next</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+    </main>
+    
+    <!-- Right Contextual Details Inspector Sidebar -->
+    <aside class="sidebar-right glass-card" id="sidebar-right">
+      <div class="panel-header">
+        <h2>Research Details</h2>
+        <div class="panel-header-actions">
+          <button class="btn btn-header" id="download-json-btn" title="Download Full JSON Data">Export Data</button>
+        </div>
+      </div>
+      
+      <!-- Dynamically filled details view -->
+      <div class="panel-content" id="detail-inspector-body">
+        <!-- Default State -->
+        <div class="default-inspector-state">
+          <div class="inspector-icon">ℹ️</div>
+          <h3>Select a Node</h3>
+          <p>Click on any article circle, theme, citation node, or numbered point in the 3D map to view its details, context figures, and source bibliography notes.</p>
+          <div class="quick-tips">
+            <h4>Quick Shortcuts</h4>
+            <ul>
+              <li><strong>Left-Click Drag:</strong> Rotate 3D graph camera</li>
+              <li><strong>Scroll Wheel:</strong> Zoom in & out</li>
+              <li><strong>Double Click:</strong> Reset camera positioning</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </aside>
+    
+  </div>
+
+  <!-- Image Modal Viewer for expanding figures -->
+  <div class="image-modal-overlay hidden" id="image-modal">
+    <div class="image-modal-content">
+      <button class="btn-close-modal" id="close-modal-btn">✕</button>
+      <img id="modal-image-src" src="" alt="Expanded Report Figure">
+      <div class="image-modal-caption" id="modal-image-caption">Figure Caption</div>
+    </div>
+  </div>
+
+  <!-- Load Three.js core library -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <!-- Load packaged UNCRPD report data and mappings -->
+  <script src="data.js"></script>
+  <!-- Load 3D WebGL Graph visualization module -->
+  <script src="graph3d.js"></script>
+  <!-- Load Main App controller and Anime explainer logic -->
+  <script src="app.js"></script>
+</body>
+</html>
