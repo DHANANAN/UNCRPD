@@ -153,68 +153,91 @@ body::before {
   mask-image: radial-gradient(circle at center, black, transparent 90%);
 }
 
-/* App Grid Structure - Ghost Fullscreen Canvas & Floating Glass Sidebars */
+/* App Grid Structure */
 .app-container {
-  position: relative;
-  width: 100vw;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
   height: 100vh;
-  overflow: hidden;
-  padding: 0;
-  margin: 0;
-  display: block;
+  gap: 0;
+  padding: 16px;
+  position: relative;
   z-index: 2;
   transition: padding var(--transition-normal);
 }
 
-/* Central WebGL Viewport spans 100% full screen behind ghost panels */
+/* Central WebGL Viewport Container */
 .viewport-container {
+  position: relative;
+  height: 100%;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background: #02060b;
+  box-shadow: inset 0 0 60px rgba(0, 0, 0, 0.8);
+  border: 1px solid var(--card-border);
+}
+
+.light-theme .viewport-container {
+  background: #fdfdf9;
+  box-shadow: inset 0 0 40px rgba(196, 154, 108, 0.08);
+}
+
+.reading-theme .viewport-container {
+  background: #fbf7ee;
+  box-shadow: inset 0 0 40px rgba(180, 142, 95, 0.08);
+}
+
+.threejs-wrapper {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
   z-index: 1;
-  overflow: hidden;
 }
 
-/* Floating Glassmorphic Sidebars */
-.sidebar-left {
-  position: absolute;
-  top: 16px;
-  bottom: 16px;
-  left: 16px;
-  width: 340px;
-  z-index: 10;
-  padding: 20px;
+#threejs-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* Sidebars Base Styling */
+.sidebar-left, .sidebar-right {
   display: flex;
   flex-direction: column;
+  height: 100%;
   overflow: hidden;
-  transform: translateX(0);
-  transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.4s ease, width 0.4s ease, border 0.4s ease;
+  position: relative;
+  z-index: 10;
+}
+
+.sidebar-left {
+  width: 340px;
+  padding: 20px;
+  margin-right: 16px;
+  transition: width var(--transition-normal), margin var(--transition-normal), padding var(--transition-normal), opacity var(--transition-normal), border var(--transition-normal), transform var(--transition-normal);
 }
 
 .sidebar-left.collapsed {
-  transform: translateX(-110%) !important;
+  width: 0 !important;
+  margin-right: 0 !important;
+  padding: 0 !important;
   opacity: 0 !important;
+  border: none !important;
   pointer-events: none;
 }
 
 .sidebar-right {
-  position: absolute;
-  top: 16px;
-  bottom: 16px;
-  right: 16px;
   width: 420px;
-  z-index: 10;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  transform: translateX(0);
-  transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.4s ease, backdrop-filter 0.4s ease;
+  margin-left: 16px;
+  transition: width var(--transition-normal), margin var(--transition-normal), padding var(--transition-normal), opacity var(--transition-normal), border var(--transition-normal), transform var(--transition-normal), backdrop-filter 0.4s ease;
 }
 
 .sidebar-right.collapsed {
-  transform: translateX(110%) !important;
+  width: 0 !important;
+  margin-left: 0 !important;
+  padding: 0 !important;
   opacity: 0 !important;
+  border: none !important;
   pointer-events: none;
 }
 
@@ -222,18 +245,43 @@ body::before {
 .top-pillbar {
   position: absolute;
   top: 16px;
-  left: 372px;
-  right: 452px;
+  left: 16px;
+  right: 16px;
   display: flex;
   justify-content: space-between;
   align-items: center;
   z-index: 20;
   pointer-events: none;
-  transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.4s ease, left 0.4s ease, right 0.4s ease;
+  transition: transform 0.4s ease, opacity 0.4s ease;
 }
 
 .top-pillbar > * {
   pointer-events: auto;
+}
+
+/* Zen Focus Mode behavior - Ghost Translucent Sidebars */
+.app-container.zen-focus-mode .sidebar-left {
+  opacity: 0.12;
+  filter: blur(0.5px);
+  pointer-events: auto;
+  transition: opacity 0.4s ease, filter 0.4s ease;
+}
+
+.app-container.zen-focus-mode .sidebar-left:hover {
+  opacity: 0.96;
+  filter: none;
+}
+
+.app-container.zen-focus-mode .sidebar-right {
+  opacity: 0.12;
+  filter: blur(0.5px);
+  pointer-events: auto;
+  transition: opacity 0.4s ease, filter 0.4s ease;
+}
+
+.app-container.zen-focus-mode .sidebar-right:hover {
+  opacity: 0.96;
+  filter: none;
 }
 
 .app-container.zen-focus-mode .top-pillbar {
@@ -2648,59 +2696,6 @@ body::before {
 }
 .reading-theme .image-modal-overlay {
   background: rgba(244, 237, 228, 0.85);
-}
-
-/* ==========================================================================
-   CUSTOM ROCKET & EXPLORER CURSOR SYSTEM
-   ========================================================================== */
-.rocket-cursor {
-  position: fixed;
-  pointer-events: none;
-  z-index: 99999;
-  width: 32px;
-  height: 32px;
-  transform: translate(-50%, -50%);
-  transition: transform 0.06s ease-out, opacity 0.2s ease;
-  will-change: transform;
-}
-
-.rocket-body-svg {
-  width: 100%;
-  height: 100%;
-  transform: rotate(-45deg);
-  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-  filter: drop-shadow(0 0 8px rgba(0, 240, 255, 0.6));
-}
-
-.rocket-cursor.hovering .rocket-body-svg {
-  transform: rotate(0deg) scale(1.25);
-  filter: drop-shadow(0 0 14px rgba(255, 121, 198, 0.8));
-  animation: rocket-orbit-pulse 1.4s ease-in-out infinite;
-}
-
-@keyframes rocket-orbit-pulse {
-  0%, 100% { transform: scale(1.2) rotate(0deg); }
-  50% { transform: scale(1.35) rotate(180deg); }
-}
-
-.stardust-trail-dot {
-  position: fixed;
-  pointer-events: none;
-  z-index: 99998;
-  border-radius: 50%;
-  background: radial-gradient(circle, #00f0ff 0%, #ffffff 70%, transparent 100%);
-  box-shadow: 0 0 6px #00f0ff;
-  transition: transform 0.4s ease-out, opacity 0.4s ease-out;
-}
-
-.light-theme .stardust-trail-dot {
-  background: radial-gradient(circle, #c4943c 0%, #ffffff 70%, transparent 100%);
-  box-shadow: 0 0 6px #c4943c;
-}
-
-.reading-theme .stardust-trail-dot {
-  background: radial-gradient(circle, #b45309 0%, #d97706 70%, transparent 100%);
-  box-shadow: 0 0 6px #b45309;
 }
 
 /* ==========================================================================

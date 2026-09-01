@@ -27,20 +27,18 @@ class UNCRPDGraph3D {
     
     // Interactivity
     this.selectedNodeId = null;
-    this.hoveredNodeId = null;
-    this.isDragging = false;
-    this.previousMousePosition = { x: 0, y: 0 };
-    
     // Active laser particles running along lines
     this.laserParticles = [];
     
-    // Space Anomalies & Cruising 3D Rocket System
-    this.spaceShips = [];
-    this.orbitingRocket = null;
+    // Space Anomalies (Black holes, Solar flares, Meteors, Cosmic quakes)
     this.blackHoles = [];
     this.solarFlares = [];
     this.meteors = [];
     this.shakeIntensity = 0;
+    
+    // Supplemental Cosmic Rockets System
+    this.spaceShips = [];
+    this.orbitingRocketGroup = null;
     
     this.initThree();
     this.initEvents();
@@ -580,6 +578,103 @@ class UNCRPDGraph3D {
     }
   }
   
+  initEvents() {
+    // Pointer Drag to Rotate
+    this.canvas.addEventListener('pointerdown', (e) => {
+      this.isDragging = true;
+      this.previousMousePosition = { x: e.clientX, y: e.clientY };
+      this.canvas.setPointerCapture(e.pointerId);
+    });
+    
+    this.canvas.addEventListener('pointermove', (e) => {
+      if (!this.isDragging) {
+        this.updateMouseCoords(e);
+        this.checkHover();
+        return;
+      }
+      
+      const deltaX = e.clientX - this.previousMousePosition.x;
+      const deltaY = e.clientY - this.previousMousePosition.y;
+      
+      this.worldRotationTarget.y += deltaX * 0.004;
+      this.worldRotationTarget.x += deltaY * 0.004;
+      
+      // Limit vertical tilt
+      this.worldRotationTarget.x = Math.max(0.1, Math.min(Math.PI / 2.2, this.worldRotationTarget.x));
+      
+      this.previousMousePosition = { x: e.clientX, y: e.clientY };
+    });
+    
+    this.canvas.addEventListener('pointerup', (e) => {
+      this.isDragging = false;
+      this.canvas.releasePointerCapture(e.pointerId);
+    });
+    
+    this.canvas.addEventListener('pointercancel', (e) => {
+      this.isDragging = false;
+    });
+    
+    // Mouse Wheel to Zoom
+    this.canvas.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      const zoomFactor = e.deltaY > 0 ? 0.90 : 1.10;
+      this.zoomTarget = Math.max(0.4, Math.min(2.5, this.zoomTarget * zoomFactor));
+    }, { passive: false });
+    
+    // Canvas Click Selection
+    this.canvas.addEventListener('click', (e) => {
+      this.updateMouseCoords(e);
+      this.handleClick(e);
+    });
+    
+    // Window Resize Handling
+    window.addEventListener('resize', () => {
+      this.onWindowResize();
+    });
+  }
+  
+  updateMouseCoords(e) {
+    const rect = this.canvas.getBoundingClientRect();
+    this.mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+    this.mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+  }
+  
+  onWindowResize() {
+    const width = this.wrapper.clientWidth || this.wrapper.offsetWidth || window.innerWidth || 800;
+    const height = this.wrapper.clientHeight || this.wrapper.offsetHeight || window.innerHeight || 600;
+    
+    if (width > 0 && height > 0) {
+      this.camera.aspect = width / height;
+      this.camera.updateProjectionMatrix();
+      this.renderer.setSize(width, height);
+      this.updateProjectedLabels();
+    }
+  }
+
+  checkHover() {
+    this.raycaster.setFromCamera(this.mouse, this.camera);
+    const meshes = Array.from(this.nodeMeshes.values());
+    const intersects = this.raycaster.intersectObjects(meshes);
+    
+    if (intersects.length > 0) {
+      const mesh = intersects[0].object;
+      const nodeId = mesh.userData.nodeId;
+      if (this.hoveredNodeId !== nodeId) {
+        this.hoveredNodeId = nodeId;
+        document.querySelectorAll('.node-label-anchor').forEach(el => {
+          el.classList.toggle('hovered', el.dataset.id === nodeId);
+        });
+      }
+    } else {
+      if (this.hoveredNodeId !== null) {
+        this.hoveredNodeId = null;
+        document.querySelectorAll('.node-label-anchor').forEach(el => {
+          el.classList.remove('hovered');
+        });
+      }
+    }
+  }
+  
   handleClick(e) {
     this.raycaster.setFromCamera(this.mouse, this.camera);
     const meshes = Array.from(this.nodeMeshes.values());
@@ -627,8 +722,8 @@ class UNCRPDGraph3D {
     for (let i = 0; i < 3; i++) {
       const shipGroup = new THREE.Group();
       
-      // Rocket Fuselage (Cone)
-      const bodyGeom = new THREE.ConeGeometry(2.0, 7.0, 8);
+      // Rocket Body Cone
+      const bodyGeom = new THREE.ConeGeometry(2.0, 6.5, 8);
       const bodyMat = new THREE.MeshPhongMaterial({
         color: colors[i % colors.length],
         emissive: 0x112233,
@@ -639,16 +734,16 @@ class UNCRPDGraph3D {
       shipGroup.add(bodyMesh);
       
       // Booster Flame Cone
-      const flameGeom = new THREE.ConeGeometry(1.2, 3.5, 6);
+      const flameGeom = new THREE.ConeGeometry(1.1, 3.2, 6);
       const flameMat = new THREE.MeshBasicMaterial({
         color: 0xff5555,
         transparent: true,
-        opacity: 0.9,
+        opacity: 0.85,
         blending: THREE.AdditiveBlending
       });
       const flameMesh = new THREE.Mesh(flameGeom, flameMat);
       flameMesh.rotation.x = -Math.PI / 2;
-      flameMesh.position.z = -4.5;
+      flameMesh.position.z = -4.2;
       shipGroup.add(flameMesh);
       
       this.graphGroup.add(shipGroup);
@@ -656,10 +751,10 @@ class UNCRPDGraph3D {
       this.spaceShips.push({
         group: shipGroup,
         flame: flameMesh,
-        startPos: new THREE.Vector3((Math.random() - 0.5) * 400, (Math.random() - 0.5) * 400, (Math.random() - 0.5) * 100),
-        targetPos: new THREE.Vector3((Math.random() - 0.5) * 400, (Math.random() - 0.5) * 400, (Math.random() - 0.5) * 100),
+        startPos: new THREE.Vector3((Math.random() - 0.5) * 350, (Math.random() - 0.5) * 350, (Math.random() - 0.5) * 80),
+        targetPos: new THREE.Vector3((Math.random() - 0.5) * 350, (Math.random() - 0.5) * 350, (Math.random() - 0.5) * 80),
         t: Math.random(),
-        speed: 0.003 + Math.random() * 0.004
+        speed: 0.003 + Math.random() * 0.003
       });
     }
   }
@@ -675,7 +770,7 @@ class UNCRPDGraph3D {
     this.orbitingRocketGroup = new THREE.Group();
     
     // Orbital path visualizer ring
-    const ringGeom = new THREE.RingGeometry(22, 23, 32);
+    const ringGeom = new THREE.RingGeometry(20, 21, 32);
     const ringMat = new THREE.MeshBasicMaterial({
       color: 0x00f0ff,
       transparent: true,
@@ -688,7 +783,7 @@ class UNCRPDGraph3D {
     this.orbitingRocketGroup.add(ringMesh);
     
     // Mini Orbiting Lander Probe
-    const probeGeom = new THREE.ConeGeometry(1.6, 5.0, 6);
+    const probeGeom = new THREE.ConeGeometry(1.5, 4.5, 6);
     const probeMat = new THREE.MeshPhongMaterial({
       color: 0xffffff,
       emissive: 0x00f0ff,
@@ -703,13 +798,65 @@ class UNCRPDGraph3D {
     this.graphGroup.add(this.orbitingRocketGroup);
     this.orbitAngle = 0;
   }
+  
+  resetView() {
+    if (this.orbitingRocketGroup) {
+      this.graphGroup.remove(this.orbitingRocketGroup);
+      this.orbitingRocketGroup = null;
+    }
+    this.panTarget.set(0, 0, 0);
+    this.zoomTarget = 0.9;
+    this.cameraTarget.set(0, 0, 520);
+    this.worldRotationTarget.x = 0.4;
+    this.worldRotationTarget.y = 0.1;
+    this.selectedNodeId = null;
+    
+    document.querySelectorAll('.node-label-anchor').forEach(el => {
+      el.classList.remove('selected');
+    });
+  }
+  
+  updateProjectedLabels() {
+    if (!this.linkLabelMeshes.length) return;
+    
+    const width = this.wrapper.clientWidth || this.wrapper.offsetWidth || window.innerWidth;
+    const height = this.wrapper.clientHeight || this.wrapper.offsetHeight || window.innerHeight;
+    const widthHalf = width / 2;
+    const heightHalf = height / 2;
+    const tempV = new THREE.Vector3();
+    
+    this.linkLabelMeshes.forEach(item => {
+      tempV.copy(item.position);
+      tempV.applyMatrix4(this.graphGroup.matrixWorld);
+      tempV.project(this.camera);
+      
+      if (tempV.z > 1) {
+        item.element.style.display = 'none';
+        return;
+      }
+      
+      const x = (tempV.x * widthHalf) + widthHalf;
+      const y = -(tempV.y * heightHalf) + heightHalf;
+      
+      item.element.style.display = 'block';
+      item.element.style.left = `${x}px`;
+      item.element.style.top = `${y}px`;
+      
+      const zIndex = Math.round((1 - tempV.z) * 1000);
+      item.element.style.zIndex = `${zIndex}`;
+      
+      const scale = Math.max(0.65, Math.min(1.15, 1 - (tempV.z * 0.5)));
+      item.element.style.transform = `translate(-50%, -50%) scale(${scale})`;
+      item.element.style.opacity = Math.max(0.2, 1.2 - tempV.z);
+    });
+  }
 
   triggerCosmicQuake() {
     this.shakeIntensity = 24.0;
     const overlay = document.querySelector('.app-container');
     if (overlay) {
       overlay.classList.remove('cosmic-quake-active');
-      void overlay.offsetWidth; // Trigger reflow
+      void overlay.offsetWidth;
       overlay.classList.add('cosmic-quake-active');
       setTimeout(() => overlay.classList.remove('cosmic-quake-active'), 900);
     }
@@ -839,37 +986,36 @@ class UNCRPDGraph3D {
       this.stars.rotation.y += 0.0003;
       this.stars.rotation.x += 0.0001;
     }
-    
-    // Animate Cruising Rocket Probes
-    this.spaceShips.forEach(ship => {
-      ship.t += ship.speed;
-      if (ship.t >= 1) {
-        ship.t = 0;
-        ship.startPos.copy(ship.targetPos);
-        // Choose a random node position as next waypoint
-        if (this.nodes.length) {
-          const randNode = this.nodes[Math.floor(Math.random() * this.nodes.length)];
-          ship.targetPos.set(randNode.x * this.densityScale, randNode.y * this.densityScale, (randNode.z || 0) * this.densityScale);
+
+    // Animate Cruising 3D Rockets (Cosmic Supplements)
+    if (this.spaceShips) {
+      this.spaceShips.forEach(ship => {
+        ship.t += ship.speed;
+        if (ship.t >= 1) {
+          ship.t = 0;
+          ship.startPos.copy(ship.targetPos);
+          if (this.nodes.length) {
+            const randNode = this.nodes[Math.floor(Math.random() * this.nodes.length)];
+            ship.targetPos.set(randNode.x * this.densityScale, randNode.y * this.densityScale, (randNode.z || 0) * this.densityScale);
+          }
         }
-      }
-      
-      const currentPos = new THREE.Vector3().lerpVectors(ship.startPos, ship.targetPos, ship.t);
-      ship.group.position.copy(currentPos);
-      
-      // Rotate ship towards direction of motion
-      const dir = new THREE.Vector3().subVectors(ship.targetPos, ship.startPos).normalize();
-      if (dir.lengthSq() > 0.001) {
-        ship.group.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), dir);
-      }
-      
-      // Flickering booster flame
-      ship.flame.scale.set(1 + Math.random() * 0.4, 1 + Math.random() * 0.6, 1 + Math.random() * 0.4);
-    });
+        
+        const currentPos = new THREE.Vector3().lerpVectors(ship.startPos, ship.targetPos, ship.t);
+        ship.group.position.copy(currentPos);
+        
+        const dir = new THREE.Vector3().subVectors(ship.targetPos, ship.startPos).normalize();
+        if (dir.lengthSq() > 0.001) {
+          ship.group.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), dir);
+        }
+        
+        ship.flame.scale.set(1 + Math.random() * 0.4, 1 + Math.random() * 0.6, 1 + Math.random() * 0.4);
+      });
+    }
 
     // Animate Orbiting Rocket Probe
     if (this.orbitingRocketGroup && this.orbitingRocketProbe) {
       this.orbitAngle = (this.orbitAngle || 0) + 0.04;
-      const radius = 22.5;
+      const radius = 20.5;
       this.orbitingRocketProbe.position.set(
         Math.cos(this.orbitAngle) * radius,
         Math.sin(this.orbitAngle) * radius * 0.5,

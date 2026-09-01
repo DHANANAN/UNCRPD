@@ -1628,80 +1628,11 @@ function bindUIEvents() {
 }
 
 // =========================================================================
-// CUSTOM ANIMATED ROCKET CURSOR & STARDUST TRAIL
-// =========================================================================
-function initRocketCursor() {
-  const cursor = document.getElementById('rocket-cursor');
-  if (!cursor) return;
-
-  let mouseX = window.innerWidth / 2;
-  let mouseY = window.innerHeight / 2;
-  let cursorX = mouseX;
-  let cursorY = mouseY;
-  let lastParticleTime = 0;
-
-  window.addEventListener('mousemove', (e) => {
-    mouseX = e.clientX;
-    mouseY = e.clientY;
-
-    const now = Date.now();
-    // Spawn subtle stardust particles on movement
-    if (now - lastParticleTime > 60) {
-      lastParticleTime = now;
-      spawnStardustDot(mouseX, mouseY);
-    }
-  });
-
-  function renderCursor() {
-    cursorX += (mouseX - cursorX) * 0.35;
-    cursorY += (mouseY - cursorY) * 0.35;
-    cursor.style.left = `${cursorX}px`;
-    cursor.style.top = `${cursorY}px`;
-    requestAnimationFrame(renderCursor);
-  }
-  renderCursor();
-
-  // Hover detection for buttons, links, inputs, and 3D labels
-  const hoverSelector = 'button, a, input, select, .node-label-anchor, .glass-card, .level-option-btn, .search-hit-item, .jump-chip';
-  document.addEventListener('mouseover', (e) => {
-    if (e.target.closest(hoverSelector)) {
-      cursor.classList.add('hovering');
-    }
-  });
-  document.addEventListener('mouseout', (e) => {
-    if (e.target.closest(hoverSelector)) {
-      cursor.classList.remove('hovering');
-    }
-  });
-}
-
-function spawnStardustDot(x, y) {
-  const dot = document.createElement('div');
-  dot.className = 'stardust-trail-dot';
-  const size = 3 + Math.random() * 4;
-  dot.style.width = `${size}px`;
-  dot.style.height = `${size}px`;
-  dot.style.left = `${x - size / 2}px`;
-  dot.style.top = `${y - size / 2}px`;
-  dot.style.opacity = '0.9';
-  document.body.appendChild(dot);
-
-  setTimeout(() => {
-    dot.style.transform = `translate(${(Math.random() - 0.5) * 16}px, ${8 + Math.random() * 12}px) scale(0.2)`;
-    dot.style.opacity = '0';
-  }, 20);
-
-  setTimeout(() => {
-    dot.remove();
-  }, 450);
-}
-
-// =========================================================================
 // SPACE ANOMALIES & EASTER EGGS CONTROLLER
 // =========================================================================
 function initSpaceAnomalies() {
   const anomaliesBtn = document.getElementById('anomalies-btn');
-  const anomalyActions = ['blackhole', 'solarflare', 'quake', 'meteor', 'probe'];
+  const anomalyActions = ['blackhole', 'solarflare', 'quake', 'meteor'];
   let anomalyIndex = 0;
 
   function triggerNextAnomaly() {
@@ -1716,11 +1647,6 @@ function initSpaceAnomalies() {
       if (window.graph3D) window.graph3D.triggerCosmicQuake();
     } else if (action === 'meteor') {
       if (window.graph3D) window.graph3D.triggerMeteorShower();
-    } else if (action === 'probe') {
-      if (window.graph3D && DATA.points.length) {
-        const randPt = DATA.points[Math.floor(Math.random() * DATA.points.length)];
-        window.graph3D.setOrbitingRocket('point:' + randPt.no);
-      }
     }
   }
 
@@ -1741,11 +1667,6 @@ function initSpaceAnomalies() {
       if (window.graph3D) window.graph3D.triggerCosmicQuake();
     } else if (e.key === 'm' || e.key === 'M') {
       if (window.graph3D) window.graph3D.triggerMeteorShower();
-    } else if (e.key === 'r' || e.key === 'R') {
-      if (window.graph3D && DATA.points.length) {
-        const randPt = DATA.points[Math.floor(Math.random() * DATA.points.length)];
-        selectPoint(randPt.no);
-      }
     }
   });
 
@@ -1775,7 +1696,6 @@ window.addEventListener('DOMContentLoaded', () => {
   triggerGraphRender();
   renderDefaultInspector();
   initSearch();
-  initRocketCursor();
   initSpaceAnomalies();
 });
 
