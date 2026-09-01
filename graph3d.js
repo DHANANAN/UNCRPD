@@ -34,8 +34,17 @@ class UNCRPDGraph3D {
     // Active laser particles running along lines
     this.laserParticles = [];
     
+    // Space Anomalies & Cruising 3D Rocket System
+    this.spaceShips = [];
+    this.orbitingRocket = null;
+    this.blackHoles = [];
+    this.solarFlares = [];
+    this.meteors = [];
+    this.shakeIntensity = 0;
+    
     this.initThree();
     this.initEvents();
+    this.initSpaceShips();
     this.animate();
   }
   
@@ -45,10 +54,10 @@ class UNCRPDGraph3D {
     
     // Create Scene
     this.scene = new THREE.Scene();
-    this.scene.fog = new THREE.FogExp2(0x02060b, 0.0012);
+    this.scene.fog = new THREE.FogExp2(0x030712, 0.0009);
     
     // Create Camera
-    this.camera = new THREE.PerspectiveCamera(50, width / height, 1, 3000);
+    this.camera = new THREE.PerspectiveCamera(50, width / height, 1, 3200);
     this.camera.position.copy(this.cameraCurrent);
     
     // Create WebGL Renderer
@@ -60,25 +69,29 @@ class UNCRPDGraph3D {
     });
     this.renderer.setSize(width, height);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    this.renderer.setClearColor(0x02060b, 1);
+    this.renderer.setClearColor(0x030712, 1);
     
     // Parent group for all graph elements (allows rotation/pan)
     this.graphGroup = new THREE.Group();
     this.scene.add(this.graphGroup);
     
-    // Add Lighting
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.25);
-    this.scene.add(ambientLight);
+    // Add Ambient & Directional Lighting
+    this.ambientLight = new THREE.AmbientLight(0xffffff, 0.55);
+    this.scene.add(this.ambientLight);
     
-    this.dirLight1 = new THREE.DirectionalLight(0x00f0ff, 0.8);
+    this.dirLight1 = new THREE.DirectionalLight(0x00f0ff, 1.2);
     this.dirLight1.position.set(200, 400, 300);
     this.scene.add(this.dirLight1);
     
-    this.dirLight2 = new THREE.DirectionalLight(0xbd93f9, 0.6);
+    this.dirLight2 = new THREE.DirectionalLight(0xbd93f9, 1.0);
     this.dirLight2.position.set(-200, -300, 200);
     this.scene.add(this.dirLight2);
+
+    this.centerLight = new THREE.PointLight(0xffffff, 1.2, 900);
+    this.centerLight.position.set(0, 0, 150);
+    this.scene.add(this.centerLight);
     
-    // Setup Cosmic Dust / Stars Background
+    // Setup Cosmic Dust / Sparkling Background
     this.createStarsBackground();
     
     // HTML label overlay container
@@ -100,14 +113,17 @@ class UNCRPDGraph3D {
   
   createStarsBackground() {
     const isLight = this.theme === 'light';
-    const starsCount = 400;
+    const isReading = this.theme === 'reading';
+    const starsCount = 550;
     const geometry = new THREE.BufferGeometry();
     const positions = new Float32Array(starsCount * 3);
     const colors = new Float32Array(starsCount * 3);
+    const sizes = new Float32Array(starsCount);
     
     for (let i = 0; i < starsCount * 3; i += 3) {
-      // Random coordinates inside a large sphere
-      const r = 700 + Math.random() * 800;
+      const idx = i / 3;
+      // Random coordinates inside a large celestial sphere
+      const r = 650 + Math.random() * 950;
       const theta = Math.random() * Math.PI * 2;
       const phi = Math.acos(2 * Math.random() - 1);
       
@@ -115,8 +131,19 @@ class UNCRPDGraph3D {
       positions[i + 1] = r * Math.sin(phi) * Math.sin(theta);
       positions[i + 2] = r * Math.cos(phi);
       
-      // Color adjustments for light/dark mode
-      if (isLight) {
+      sizes[idx] = 2.0 + Math.random() * 3.5;
+      
+      if (isReading) {
+        // Reading theme: warm slate, amber dust, and soft cream stars
+        const rand = Math.random();
+        if (rand < 0.45) {
+          colors[i] = 0.70; colors[i + 1] = 0.64; colors[i + 2] = 0.58; // Soft warm slate
+        } else if (rand < 0.8) {
+          colors[i] = 0.82; colors[i + 1] = 0.58; colors[i + 2] = 0.22; // Amber bronze
+        } else {
+          colors[i] = 0.55; colors[i + 1] = 0.50; colors[i + 2] = 0.45; // Subtle brown
+        }
+      } else if (isLight) {
         // Light theme: soft sand/gold and sepia sparks
         const rand = Math.random();
         if (rand < 0.5) {
@@ -125,14 +152,18 @@ class UNCRPDGraph3D {
           colors[i] = 0.45; colors[i + 1] = 0.38; colors[i + 2] = 0.31; // Soft sepia brown
         }
       } else {
-        // Dark theme: cyan, purple, or white sparkles
+        // Dark theme: Sparkling diamond silver, radiant cyan, and soft violet starlight
         const rand = Math.random();
-        if (rand < 0.4) {
-          colors[i] = 0.0; colors[i + 1] = 0.94; colors[i + 2] = 1.0; // Cyan
-        } else if (rand < 0.8) {
-          colors[i] = 0.74; colors[i + 1] = 0.57; colors[i + 2] = 0.97; // Purple
+        if (rand < 0.65) {
+          // Pure Silver & Diamond White
+          colors[i] = 0.95; colors[i + 1] = 0.97; colors[i + 2] = 1.0;
+          sizes[idx] = 2.5 + Math.random() * 3.0;
+        } else if (rand < 0.85) {
+          // Neon Celestial Cyan
+          colors[i] = 0.15; colors[i + 1] = 0.94; colors[i + 2] = 1.0;
         } else {
-          colors[i] = 1.0; colors[i + 1] = 1.0; colors[i + 2] = 1.0; // White
+          // Electric Violet
+          colors[i] = 0.82; colors[i + 1] = 0.68; colors[i + 2] = 1.0;
         }
       }
     }
@@ -140,13 +171,12 @@ class UNCRPDGraph3D {
     geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
     geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
     
-    // Material using circular point textures
     const material = new THREE.PointsMaterial({
-      size: isLight ? 4.5 : 3.5,
+      size: (isLight || isReading) ? 4.5 : 4.0,
       vertexColors: true,
       transparent: true,
-      opacity: isLight ? 0.45 : 0.6,
-      blending: THREE.NormalBlending,
+      opacity: (isLight || isReading) ? 0.45 : 0.85,
+      blending: (isLight || isReading) ? THREE.NormalBlending : THREE.AdditiveBlending,
       sizeAttenuation: true
     });
     
@@ -235,22 +265,42 @@ class UNCRPDGraph3D {
   setTheme(themeName) {
     this.theme = themeName;
     const isLight = themeName === 'light';
+    const isReading = themeName === 'reading';
     
-    // 1. Update clear color and fog matching light sepia grid paper
-    const bgColor = isLight ? 0xfaf4e3 : 0x02060b;
-    this.renderer.setClearColor(bgColor, 1);
-    this.scene.fog.color.setHex(bgColor);
-    
-    // 2. Update directional lighting colors for sepia/warm gold tone contrast
-    if (isLight) {
-      this.dirLight1.color.setHex(0xb37d14);
-      this.dirLight2.color.setHex(0x7a3ebb);
-    } else {
-      this.dirLight1.color.setHex(0x00f0ff);
-      this.dirLight2.color.setHex(0xbd93f9);
+    // 1. Update clear color and fog matching theme background
+    let bgColor = 0x030712; // Dark theme default
+    if (isReading) {
+      bgColor = 0xf4ede4; // Warm reading parchment
+    } else if (isLight) {
+      bgColor = 0xfaf4e3; // Light gold graph paper
     }
     
-    // 3. Dispose and recreate star background for theme mapping
+    this.renderer.setClearColor(bgColor, 1);
+    this.scene.fog.color.setHex(bgColor);
+    this.scene.fog.density = (isLight || isReading) ? 0.0010 : 0.0009;
+    
+    // 2. Update directional & ambient lighting colors
+    if (isReading) {
+      this.ambientLight.color.setHex(0xfff8ee);
+      this.ambientLight.intensity = 0.85;
+      this.dirLight1.color.setHex(0xd97706);
+      this.dirLight2.color.setHex(0x9a3412);
+      if (this.centerLight) this.centerLight.color.setHex(0xb45309);
+    } else if (isLight) {
+      this.ambientLight.color.setHex(0xffffff);
+      this.ambientLight.intensity = 0.85;
+      this.dirLight1.color.setHex(0xb37d14);
+      this.dirLight2.color.setHex(0x7a3ebb);
+      if (this.centerLight) this.centerLight.color.setHex(0xc4943c);
+    } else {
+      this.ambientLight.color.setHex(0xffffff);
+      this.ambientLight.intensity = 0.55;
+      this.dirLight1.color.setHex(0x00f0ff);
+      this.dirLight2.color.setHex(0xbd93f9);
+      if (this.centerLight) this.centerLight.color.setHex(0xffffff);
+    }
+    
+    // 3. Dispose and recreate star background
     if (this.stars) {
       this.scene.remove(this.stars);
       this.stars.geometry.dispose();
@@ -278,43 +328,57 @@ class UNCRPDGraph3D {
     this.laserParticles = [];
     
     const isLight = this.theme === 'light';
+    const isReading = this.theme === 'reading';
     
     // Pre-create basic geometries
-    const sphereGeom = new THREE.SphereGeometry(1, 16, 12);
+    const sphereGeom = new THREE.SphereGeometry(1, 20, 16);
     const starGeom = new THREE.IcosahedronGeometry(1, 1);
+    const centerGeom = new THREE.DodecahedronGeometry(1, 1);
     
-    // 1. Render Node Meshes
+    // 1. Render Node Meshes with enhanced brightness and emissive glow
     this.nodes.forEach(node => {
-      let size = 3;
-      let color = 0xbd93f9;
-      let emissive = 0x110022;
+      let size = 3.8;
+      let color = 0xc4b5fd;
+      let emissive = 0x3b1d6e;
       let geom = sphereGeom;
+      let shininess = 50;
       
       switch (node.type) {
+        case 'center':
+          size = (isLight || isReading) ? 8.5 : 9.8;
+          color = isReading ? 0xb45309 : (isLight ? 0xc4943c : 0x00f0ff);
+          emissive = isReading ? 0x331400 : (isLight ? 0x3d2805 : 0x006688);
+          geom = centerGeom;
+          shininess = 80;
+          break;
         case 'article':
         case 'article center':
-          size = 7.5;
-          color = isLight ? 0xc4943c : 0x00f0ff;
-          emissive = isLight ? 0x3d2805 : 0x002244;
+          size = (isLight || isReading) ? 7.5 : 8.5;
+          color = isReading ? 0xb45309 : (isLight ? 0xc4943c : 0x00f0ff);
+          emissive = isReading ? 0x2e1503 : (isLight ? 0x3d2805 : 0x005577);
+          shininess = 65;
           break;
         case 'theme':
         case 'theme center':
-          size = 6.0;
-          color = isLight ? 0xb37d14 : 0xffb86c;
-          emissive = isLight ? 0x221300 : 0x331e00;
+          size = (isLight || isReading) ? 6.2 : 7.2;
+          color = isReading ? 0xc2410c : (isLight ? 0xb37d14 : 0xffb86c);
+          emissive = isReading ? 0x2e0d00 : (isLight ? 0x221300 : 0x663300);
           geom = starGeom;
+          shininess = 60;
           break;
         case 'source':
-          size = 3.5;
-          color = isLight ? 0xd81b60 : 0xff79c6;
-          emissive = isLight ? 0x33000a : 0x33001e;
+          size = (isLight || isReading) ? 4.0 : 4.6;
+          color = isReading ? 0xbe123c : (isLight ? 0xd81b60 : 0xff79c6);
+          emissive = isReading ? 0x33000f : (isLight ? 0x33000a : 0x550033);
+          shininess = 50;
           break;
         case 'point':
         case 'point center':
         default:
-          size = 2.8;
-          color = isLight ? 0x7a3ebb : 0xbd93f9;
-          emissive = isLight ? 0x0d001a : 0x110022;
+          size = (isLight || isReading) ? 3.2 : 3.8;
+          color = isReading ? 0x475569 : (isLight ? 0x7a3ebb : 0xc4b5fd);
+          emissive = isReading ? 0x0f172a : (isLight ? 0x0d001a : 0x3b1d6e);
+          shininess = 60;
           break;
       }
       
@@ -322,9 +386,9 @@ class UNCRPDGraph3D {
       const material = new THREE.MeshPhongMaterial({
         color: color,
         emissive: emissive,
-        shininess: 30,
-        specular: 0xffffff,
-        flatShading: node.type === 'theme'
+        shininess: shininess,
+        specular: (isLight || isReading) ? 0xeeeeee : 0xffffff,
+        flatShading: node.type === 'theme' || node.type === 'theme center'
       });
       
       const mesh = new THREE.Mesh(geom, material);
@@ -336,26 +400,52 @@ class UNCRPDGraph3D {
       this.nodeMeshes.set(node.id, mesh);
     });
     
-    // 2. Render Connection Lines
+    // 2. Render Sparkling Silver & Luminous Connection Lines
+    let lineMatColor = 0xcbd5e1; // Silver default for dark mode
+    let strongLineColor = 0xffffff; // Brilliant platinum silver for dark mode
+    let dashedLineColor = 0xf472b6; // Silver rose for dark mode
+    let lineOpacity = 0.70;
+    let strongOpacity = 0.92;
+    let dashedOpacity = 0.70;
+    let blendingMode = THREE.AdditiveBlending;
+    
+    if (isReading) {
+      lineMatColor = 0x78716c; // Soft warm graphite
+      strongLineColor = 0xb45309; // Warm bronze
+      dashedLineColor = 0xbe123c; // Warm crimson
+      lineOpacity = 0.55;
+      strongOpacity = 0.82;
+      dashedOpacity = 0.65;
+      blendingMode = THREE.NormalBlending;
+    } else if (isLight) {
+      lineMatColor = 0x9c8f80;
+      strongLineColor = 0xc4943c;
+      dashedLineColor = 0xd81b60;
+      lineOpacity = 0.55;
+      strongOpacity = 0.80;
+      dashedOpacity = 0.60;
+      blendingMode = THREE.NormalBlending;
+    }
+    
     const lineMaterial = new THREE.LineBasicMaterial({
-      color: isLight ? 0x9c8f80 : 0x486480,
+      color: lineMatColor,
       transparent: true,
-      opacity: isLight ? 0.55 : 0.35,
-      blending: isLight ? THREE.NormalBlending : THREE.AdditiveBlending
+      opacity: lineOpacity,
+      blending: blendingMode
     });
     
     const strongLineMaterial = new THREE.LineBasicMaterial({
-      color: isLight ? 0xc4943c : 0x00f0ff,
+      color: strongLineColor,
       transparent: true,
-      opacity: isLight ? 0.8 : 0.65,
-      blending: isLight ? THREE.NormalBlending : THREE.AdditiveBlending
+      opacity: strongOpacity,
+      blending: blendingMode
     });
     
     const dashedMaterial = new THREE.LineBasicMaterial({
-      color: isLight ? 0xd81b60 : 0xff79c6,
+      color: dashedLineColor,
       transparent: true,
-      opacity: isLight ? 0.6 : 0.45,
-      blending: isLight ? THREE.NormalBlending : THREE.AdditiveBlending
+      opacity: dashedOpacity,
+      blending: blendingMode
     });
     
     this.links.forEach(link => {
@@ -373,8 +463,8 @@ class UNCRPDGraph3D {
       const line = new THREE.Line(geometry, mat);
       this.graphGroup.add(line);
       
-      // Trigger a laser data stream animation along the connection line
-      if (Math.random() < 0.6) {
+      // Generate sparkling stardust particles traveling along connection threads
+      if (Math.random() < 0.75) {
         this.createLaserParticle(fromMesh.position, toMesh.position, link.type);
       }
     });
@@ -384,18 +474,36 @@ class UNCRPDGraph3D {
   
   createLaserParticle(start, end, linkType) {
     const isLight = this.theme === 'light';
+    const isReading = this.theme === 'reading';
     
-    let color = isLight ? 0xc4943c : 0x00f0ff;
-    if (linkType === 'sourceEdge') color = isLight ? 0xd81b60 : 0xff79c6;
-    if (linkType === 'strong') color = isLight ? 0xb37d14 : 0xffb86c;
+    let color = 0xffffff; // Pure silver default
+    if (isReading) {
+      color = (linkType === 'sourceEdge') ? 0xbe123c : ((linkType === 'strong') ? 0xd97706 : 0x78716c);
+    } else if (isLight) {
+      color = (linkType === 'sourceEdge') ? 0xd81b60 : ((linkType === 'strong') ? 0xb37d14 : 0xc4943c);
+    } else {
+      // Dark Mode Silver & Diamond Sparkles
+      const r = Math.random();
+      if (r < 0.55) {
+        color = 0xffffff; // Diamond Silver White
+      } else if (r < 0.8) {
+        color = 0xdbeafe; // Soft Ice Silver
+      } else if (linkType === 'sourceEdge') {
+        color = 0xf472b6; // Rose Sparkle
+      } else {
+        color = 0x00f0ff; // Cyan Stardust
+      }
+    }
     
     this.laserParticles.push({
       start: start.clone(),
       end: end.clone(),
       position: start.clone(),
       t: Math.random(),
-      speed: 0.006 + Math.random() * 0.01,
-      color: color
+      speed: 0.005 + Math.random() * 0.009,
+      color: color,
+      sparklePhase: Math.random() * Math.PI * 2,
+      baseSize: 1.2 + Math.random() * 0.8
     });
   }
   
@@ -504,62 +612,213 @@ class UNCRPDGraph3D {
       this.zoomTarget = 1.3;
       this.cameraTarget.set(0, 0, zoomDist);
       
+      this.setOrbitingRocket(nodeId);
+      
       if (this.onNodeSelected) {
         this.onNodeSelected(mesh.userData.nodeData);
       }
     }
   }
   
-  resetView() {
-    this.panTarget.set(0, 0, 0);
-    this.zoomTarget = 0.9;
-    this.cameraTarget.set(0, 0, 520);
-    this.worldRotationTarget.x = 0.4;
-    this.worldRotationTarget.y = 0.1;
-    this.selectedNodeId = null;
+  initSpaceShips() {
+    this.spaceShips = [];
+    const colors = [0x00f0ff, 0xff79c6, 0xffb86c];
     
-    document.querySelectorAll('.node-label-anchor').forEach(el => {
-      el.classList.remove('selected');
+    for (let i = 0; i < 3; i++) {
+      const shipGroup = new THREE.Group();
+      
+      // Rocket Fuselage (Cone)
+      const bodyGeom = new THREE.ConeGeometry(2.0, 7.0, 8);
+      const bodyMat = new THREE.MeshPhongMaterial({
+        color: colors[i % colors.length],
+        emissive: 0x112233,
+        shininess: 80
+      });
+      const bodyMesh = new THREE.Mesh(bodyGeom, bodyMat);
+      bodyMesh.rotation.x = Math.PI / 2;
+      shipGroup.add(bodyMesh);
+      
+      // Booster Flame Cone
+      const flameGeom = new THREE.ConeGeometry(1.2, 3.5, 6);
+      const flameMat = new THREE.MeshBasicMaterial({
+        color: 0xff5555,
+        transparent: true,
+        opacity: 0.9,
+        blending: THREE.AdditiveBlending
+      });
+      const flameMesh = new THREE.Mesh(flameGeom, flameMat);
+      flameMesh.rotation.x = -Math.PI / 2;
+      flameMesh.position.z = -4.5;
+      shipGroup.add(flameMesh);
+      
+      this.graphGroup.add(shipGroup);
+      
+      this.spaceShips.push({
+        group: shipGroup,
+        flame: flameMesh,
+        startPos: new THREE.Vector3((Math.random() - 0.5) * 400, (Math.random() - 0.5) * 400, (Math.random() - 0.5) * 100),
+        targetPos: new THREE.Vector3((Math.random() - 0.5) * 400, (Math.random() - 0.5) * 400, (Math.random() - 0.5) * 100),
+        t: Math.random(),
+        speed: 0.003 + Math.random() * 0.004
+      });
+    }
+  }
+
+  setOrbitingRocket(nodeId) {
+    if (this.orbitingRocketGroup) {
+      this.graphGroup.remove(this.orbitingRocketGroup);
+    }
+    
+    const nodeMesh = this.nodeMeshes.get(nodeId);
+    if (!nodeMesh) return;
+    
+    this.orbitingRocketGroup = new THREE.Group();
+    
+    // Orbital path visualizer ring
+    const ringGeom = new THREE.RingGeometry(22, 23, 32);
+    const ringMat = new THREE.MeshBasicMaterial({
+      color: 0x00f0ff,
+      transparent: true,
+      opacity: 0.35,
+      side: THREE.DoubleSide,
+      blending: THREE.AdditiveBlending
+    });
+    const ringMesh = new THREE.Mesh(ringGeom, ringMat);
+    ringMesh.rotation.x = Math.PI / 3;
+    this.orbitingRocketGroup.add(ringMesh);
+    
+    // Mini Orbiting Lander Probe
+    const probeGeom = new THREE.ConeGeometry(1.6, 5.0, 6);
+    const probeMat = new THREE.MeshPhongMaterial({
+      color: 0xffffff,
+      emissive: 0x00f0ff,
+      shininess: 90
+    });
+    const probeMesh = new THREE.Mesh(probeGeom, probeMat);
+    probeMesh.rotation.x = Math.PI / 2;
+    this.orbitingRocketProbe = probeMesh;
+    this.orbitingRocketGroup.add(probeMesh);
+    
+    this.orbitingRocketGroup.position.copy(nodeMesh.position);
+    this.graphGroup.add(this.orbitingRocketGroup);
+    this.orbitAngle = 0;
+  }
+
+  triggerCosmicQuake() {
+    this.shakeIntensity = 24.0;
+    const overlay = document.querySelector('.app-container');
+    if (overlay) {
+      overlay.classList.remove('cosmic-quake-active');
+      void overlay.offsetWidth; // Trigger reflow
+      overlay.classList.add('cosmic-quake-active');
+      setTimeout(() => overlay.classList.remove('cosmic-quake-active'), 900);
+    }
+  }
+
+  triggerSolarFlare() {
+    const flareOverlay = document.getElementById('solar-flare-overlay');
+    if (flareOverlay) {
+      flareOverlay.classList.remove('active');
+      void flareOverlay.offsetWidth;
+      flareOverlay.classList.add('active');
+      setTimeout(() => flareOverlay.classList.remove('active'), 2500);
+    }
+    
+    // 3D Visual Plasma Wave Sphere
+    const geom = new THREE.SphereGeometry(10, 24, 24);
+    const mat = new THREE.MeshBasicMaterial({
+      color: 0xffb86c,
+      transparent: true,
+      opacity: 0.85,
+      blending: THREE.AdditiveBlending,
+      wireframe: true
+    });
+    const flareMesh = new THREE.Mesh(geom, mat);
+    flareMesh.position.set(0, 0, 80);
+    this.graphGroup.add(flareMesh);
+    
+    this.solarFlares.push({
+      mesh: flareMesh,
+      scale: 1,
+      maxScale: 65,
+      opacity: 0.85
     });
   }
-  
-  updateProjectedLabels() {
-    if (!this.linkLabelMeshes.length) return;
+
+  triggerBlackHole(x = 0, y = 0, z = 50) {
+    const holeOverlay = document.getElementById('black-hole-overlay');
+    if (holeOverlay) {
+      holeOverlay.classList.remove('active');
+      void holeOverlay.offsetWidth;
+      holeOverlay.classList.add('active');
+      setTimeout(() => holeOverlay.classList.remove('active'), 4000);
+    }
     
-    const width = this.wrapper.clientWidth;
-    const height = this.wrapper.clientHeight;
-    const widthHalf = width / 2;
-    const heightHalf = height / 2;
-    const tempV = new THREE.Vector3();
+    const bhGroup = new THREE.Group();
+    bhGroup.position.set(x, y, z);
     
-    this.linkLabelMeshes.forEach(item => {
-      tempV.copy(item.position);
-      tempV.applyMatrix4(this.graphGroup.matrixWorld);
-      tempV.project(this.camera);
-      
-      if (tempV.z > 1) {
-        item.element.style.display = 'none';
-        return;
-      }
-      
-      const x = (tempV.x * widthHalf) + widthHalf;
-      const y = -(tempV.y * heightHalf) + heightHalf;
-      
-      item.element.style.display = 'block';
-      item.element.style.left = `${x}px`;
-      item.element.style.top = `${y}px`;
-      
-      const zIndex = Math.round((1 - tempV.z) * 1000);
-      item.element.style.zIndex = `${zIndex}`;
-      
-      const scale = Math.max(0.65, Math.min(1.15, 1 - (tempV.z * 0.5)));
-      item.element.style.transform = `translate(-50%, -50%) scale(${scale})`;
-      item.element.style.opacity = Math.max(0.2, 1.2 - tempV.z);
+    // Event Horizon Sphere
+    const sphereGeom = new THREE.SphereGeometry(14, 24, 24);
+    const sphereMat = new THREE.MeshBasicMaterial({ color: 0x000000 });
+    const sphereMesh = new THREE.Mesh(sphereGeom, sphereMat);
+    bhGroup.add(sphereMesh);
+    
+    // Accretion Disk
+    const diskGeom = new THREE.RingGeometry(16, 42, 32);
+    const diskMat = new THREE.MeshBasicMaterial({
+      color: 0xbd93f9,
+      transparent: true,
+      opacity: 0.8,
+      side: THREE.DoubleSide,
+      blending: THREE.AdditiveBlending
+    });
+    const diskMesh = new THREE.Mesh(diskGeom, diskMat);
+    diskMesh.rotation.x = Math.PI / 2.5;
+    bhGroup.add(diskMesh);
+    
+    this.graphGroup.add(bhGroup);
+    this.blackHoles.push({
+      group: bhGroup,
+      disk: diskMesh,
+      life: 300
     });
   }
-  
+
+  triggerMeteorShower() {
+    for (let i = 0; i < 8; i++) {
+      const geom = new THREE.CylinderGeometry(0.3, 1.2, 35, 6);
+      const mat = new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        transparent: true,
+        opacity: 0.9,
+        blending: THREE.AdditiveBlending
+      });
+      const mesh = new THREE.Mesh(geom, mat);
+      mesh.position.set(
+        (Math.random() - 0.5) * 800,
+        350 + Math.random() * 200,
+        (Math.random() - 0.5) * 400
+      );
+      mesh.rotation.z = Math.PI / 3;
+      this.graphGroup.add(mesh);
+      
+      this.meteors.push({
+        mesh: mesh,
+        vel: new THREE.Vector3(-14 - Math.random() * 6, -10 - Math.random() * 5, 0),
+        life: 60 + Math.random() * 30
+      });
+    }
+  }
+
   animate() {
     requestAnimationFrame(() => this.animate());
+    
+    // Camera shake decay (Cosmic Quake)
+    if (this.shakeIntensity > 0.1) {
+      this.camera.position.x += (Math.random() - 0.5) * this.shakeIntensity;
+      this.camera.position.y += (Math.random() - 0.5) * this.shakeIntensity;
+      this.shakeIntensity *= 0.88;
+    }
     
     this.worldRotationCurrent.x += (this.worldRotationTarget.x - this.worldRotationCurrent.x) * 0.08;
     this.worldRotationCurrent.y += (this.worldRotationTarget.y - this.worldRotationCurrent.y) * 0.08;
@@ -581,8 +840,88 @@ class UNCRPDGraph3D {
       this.stars.rotation.x += 0.0001;
     }
     
-    this.animateLasers();
+    // Animate Cruising Rocket Probes
+    this.spaceShips.forEach(ship => {
+      ship.t += ship.speed;
+      if (ship.t >= 1) {
+        ship.t = 0;
+        ship.startPos.copy(ship.targetPos);
+        // Choose a random node position as next waypoint
+        if (this.nodes.length) {
+          const randNode = this.nodes[Math.floor(Math.random() * this.nodes.length)];
+          ship.targetPos.set(randNode.x * this.densityScale, randNode.y * this.densityScale, (randNode.z || 0) * this.densityScale);
+        }
+      }
+      
+      const currentPos = new THREE.Vector3().lerpVectors(ship.startPos, ship.targetPos, ship.t);
+      ship.group.position.copy(currentPos);
+      
+      // Rotate ship towards direction of motion
+      const dir = new THREE.Vector3().subVectors(ship.targetPos, ship.startPos).normalize();
+      if (dir.lengthSq() > 0.001) {
+        ship.group.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), dir);
+      }
+      
+      // Flickering booster flame
+      ship.flame.scale.set(1 + Math.random() * 0.4, 1 + Math.random() * 0.6, 1 + Math.random() * 0.4);
+    });
+
+    // Animate Orbiting Rocket Probe
+    if (this.orbitingRocketGroup && this.orbitingRocketProbe) {
+      this.orbitAngle = (this.orbitAngle || 0) + 0.04;
+      const radius = 22.5;
+      this.orbitingRocketProbe.position.set(
+        Math.cos(this.orbitAngle) * radius,
+        Math.sin(this.orbitAngle) * radius * 0.5,
+        Math.sin(this.orbitAngle) * radius * 0.8
+      );
+      this.orbitingRocketProbe.rotation.z = this.orbitAngle + Math.PI / 2;
+    }
+
+    // Animate Solar Flares
+    for (let i = this.solarFlares.length - 1; i >= 0; i--) {
+      const sf = this.solarFlares[i];
+      sf.scale += 1.2;
+      sf.opacity *= 0.95;
+      sf.mesh.scale.set(sf.scale, sf.scale, sf.scale);
+      sf.mesh.material.opacity = sf.opacity;
+      
+      if (sf.opacity < 0.02 || sf.scale > sf.maxScale) {
+        this.graphGroup.remove(sf.mesh);
+        sf.mesh.geometry.dispose();
+        sf.mesh.material.dispose();
+        this.solarFlares.splice(i, 1);
+      }
+    }
+
+    // Animate Black Holes
+    for (let i = this.blackHoles.length - 1; i >= 0; i--) {
+      const bh = this.blackHoles[i];
+      bh.disk.rotation.z += 0.06;
+      bh.life -= 1;
+      
+      if (bh.life <= 0) {
+        this.graphGroup.remove(bh.group);
+        this.blackHoles.splice(i, 1);
+      }
+    }
+
+    // Animate Meteors
+    for (let i = this.meteors.length - 1; i >= 0; i--) {
+      const m = this.meteors[i];
+      m.mesh.position.add(m.vel);
+      m.life -= 1;
+      m.mesh.material.opacity = m.life / 60;
+      
+      if (m.life <= 0) {
+        this.graphGroup.remove(m.mesh);
+        m.mesh.geometry.dispose();
+        m.mesh.material.dispose();
+        this.meteors.splice(i, 1);
+      }
+    }
     
+    this.animateLasers();
     this.renderer.render(this.scene, this.camera);
     this.updateProjectedLabels();
   }
@@ -593,7 +932,9 @@ class UNCRPDGraph3D {
     }
     this.particleMeshes = [];
     
-    const geom = new THREE.SphereGeometry(1.2, 8, 8);
+    const geom = new THREE.SphereGeometry(1.0, 8, 8);
+    const now = Date.now();
+    const isDark = this.theme === 'dark' || !this.theme;
     
     this.laserParticles.forEach(lp => {
       lp.t += lp.speed;
@@ -603,14 +944,20 @@ class UNCRPDGraph3D {
       
       lp.position.lerpVectors(lp.start, lp.end, lp.t);
       
+      // Dynamic sparkle pulse calculation
+      const pulse = Math.sin(now * 0.008 + lp.sparklePhase);
+      const currentSize = lp.baseSize * (1.0 + (isDark ? 0.45 * pulse : 0.25 * pulse));
+      const opacity = isDark ? (0.80 + 0.20 * pulse) : 0.85;
+      
       const mat = new THREE.MeshBasicMaterial({
         color: lp.color,
         transparent: true,
-        opacity: 0.9,
-        blending: THREE.AdditiveBlending
+        opacity: Math.max(0.4, opacity),
+        blending: isDark ? THREE.AdditiveBlending : THREE.NormalBlending
       });
       
       const mesh = new THREE.Mesh(geom, mat);
+      mesh.scale.set(currentSize, currentSize, currentSize);
       mesh.position.copy(lp.position).multiplyScalar(this.densityScale);
       
       this.graphGroup.add(mesh);

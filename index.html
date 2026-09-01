@@ -127,11 +127,25 @@
           <span id="current-mode-label">Interactive Overview Mode</span>
         </div>
         <div class="pill-actions" id="top-bar-actions">
+          <button class="btn btn-action btn-doc-highlight" id="indoc-viewer-btn" title="Open Official UNCRPD State Report Document">📄 Report Doc</button>
+          <button class="btn btn-action" id="anomalies-btn" title="Trigger Cosmic Space Anomalies & Easter Eggs">🌌 Anomalies</button>
           <button class="btn btn-action" id="help-tutorial-btn">❓ Help Tutorial</button>
           <button class="btn btn-action" id="reset-view-btn">Reset View</button>
           <button class="btn btn-action" id="toggle-right-btn">Toggle Details</button>
         </div>
       </div>
+      
+      <!-- Floating Zen Focus Mode Notification Pill -->
+      <div class="zen-focus-pill hidden" id="zen-focus-pill">
+        <span class="zen-sparkle">✨</span>
+        <span class="zen-text">Zen Exploration Mode</span>
+        <span class="zen-hint">(Move mouse to edge or press Esc to exit)</span>
+        <button class="zen-exit-btn" id="zen-exit-btn" title="Exit Zen Focus Mode">✕</button>
+      </div>
+      
+      <!-- Cosmic Space Anomaly Visual Overlays -->
+      <div class="solar-flare-overlay" id="solar-flare-overlay"></div>
+      <div class="black-hole-overlay" id="black-hole-overlay"></div>
       
       <!-- Three.js Canvas -->
       <div class="threejs-wrapper" id="threejs-wrapper">
@@ -200,7 +214,7 @@
           <h2>Research Details</h2>
         </div>
         <div class="panel-header-actions" id="panel-header-actions-widget">
-          <button class="btn btn-header" id="theme-toggle-btn">☀ Light Mode</button>
+          <button class="btn btn-header btn-theme-switcher" id="theme-toggle-btn" title="Switch between Dark, Light, and Reading-Friendly mode">🌙 Dark Mode</button>
           <button class="btn btn-header" id="download-json-btn" title="Download Full JSON Data">Export Data</button>
         </div>
       </div>
@@ -218,6 +232,7 @@
               <li><strong>Left-Click Drag:</strong> Rotate 3D graph camera</li>
               <li><strong>Scroll Wheel:</strong> Zoom in & out</li>
               <li><strong>Double Click:</strong> Reset camera positioning</li>
+              <li><strong>5s Hover on Canvas:</strong> Zen Focus exploration</li>
             </ul>
           </div>
         </div>
@@ -271,6 +286,48 @@
     </div>
   </div>
 
+  <!-- Dedicated In-Doc Google Drive Report Viewer Modal -->
+  <div class="indoc-modal-overlay hidden" id="indoc-modal">
+    <div class="indoc-modal-container glass-card">
+      <div class="indoc-modal-header">
+        <div class="indoc-modal-title-group">
+          <div class="indoc-icon">📄</div>
+          <div>
+            <h3>India UNCRPD State Report</h3>
+            <span class="indoc-subtitle">Official UN First Country Submission Document</span>
+          </div>
+        </div>
+        <div class="indoc-modal-controls">
+          <a href="https://drive.google.com/file/d/1y3Lsy7hITnZfzWgbRUCHY7v7wSIYlVsn/view?usp=sharing" target="_blank" rel="noopener noreferrer" class="btn btn-action btn-doc-ext" title="Open directly in Google Drive in a new tab">
+            <span>Open in Drive</span> ↗
+          </a>
+          <button class="btn btn-action" id="indoc-fullscreen-btn" title="Toggle Fullscreen">⛶ Fullscreen</button>
+          <button class="btn-close-modal" id="close-indoc-btn" title="Close Document Viewer">✕</button>
+        </div>
+      </div>
+      
+      <!-- Quick Chapter Jump Bar -->
+      <div class="indoc-quick-jump-bar" id="indoc-quick-jump">
+        <span class="jump-label">Quick Jump:</span>
+        <button class="jump-chip" data-title="Table of Contents">📑 Contents</button>
+        <button class="jump-chip" data-title="Article 1-4 General Principles">Art. 1-4 Principles</button>
+        <button class="jump-chip" data-title="Article 5 Equality and Non-Discrimination">Art. 5 Equality</button>
+        <button class="jump-chip" data-title="Article 9 Accessibility">Art. 9 Accessibility</button>
+        <button class="jump-chip" data-title="Article 24 Education">Art. 24 Education</button>
+        <button class="jump-chip" data-title="Article 27 Work and Employment">Art. 27 Employment</button>
+        <button class="jump-chip" data-title="Article 31 Statistics and Data Collection">Art. 31 Statistics</button>
+      </div>
+      
+      <div class="indoc-iframe-wrapper">
+        <div class="indoc-loading-spinner" id="indoc-spinner">
+          <div class="spinner"></div>
+          <span>Loading UNCRPD Report from Google Drive...</span>
+        </div>
+        <iframe id="indoc-iframe" src="" title="India UNCRPD State Report Document Viewer" allow="fullscreen"></iframe>
+      </div>
+    </div>
+  </div>
+
   <!-- Image Modal Viewer for expanding figures -->
   <div class="image-modal-overlay hidden" id="image-modal">
     <div class="image-modal-content">
@@ -278,6 +335,60 @@
       <img id="modal-image-src" src="" alt="Expanded Report Figure">
       <div class="image-modal-caption" id="modal-image-caption">Figure Caption</div>
     </div>
+  </div>
+
+  <!-- Ami 3-Level Guided Story & Autopilot Tour Level Selector Modal -->
+  <div class="tour-level-modal-overlay hidden" id="tour-level-modal">
+    <div class="tour-level-card glass-card">
+      <div class="tour-level-header">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <span style="font-size: 24px;">✨</span>
+          <h3>Choose Ami's Story Tour Level</h3>
+        </div>
+        <button class="btn-close-modal" id="close-tour-level-btn">✕</button>
+      </div>
+      <p style="font-size: 13px; color: var(--color-muted); line-height: 1.4;">
+        Ami can guide your exploration based on how deep you'd like to dive into the India UNCRPD state report!
+      </p>
+      <div class="tour-level-options">
+        <div class="level-option-btn" data-level="1">
+          <span class="level-icon">🌟</span>
+          <div class="level-info">
+            <h4>Level 1: Quick Dashboard Guide</h4>
+            <p>Simple intro explaining the 3D map controls, search engine, theme modes, and report document viewer.</p>
+          </div>
+          <span class="level-badge-tag">Intro</span>
+        </div>
+        <div class="level-option-btn" data-level="2">
+          <span class="level-icon">🚀</span>
+          <div class="level-info">
+            <h4>Level 2: Guided Case Study Tour</h4>
+            <p>Ami zooms into 3-4 landmark points across Accessibility (Art. 9) & Education (Art. 24) with infographic reveals.</p>
+          </div>
+          <span class="level-badge-tag">3-4 Points</span>
+        </div>
+        <div class="level-option-btn" data-level="3">
+          <span class="level-icon">🛸</span>
+          <div class="level-info">
+            <h4>Level 3: Deep Autopilot Research Walkthrough</h4>
+            <p>Full hands-free autopilot! Ami explores 9-10 interconnected points across Employment, Equality & landmark Supreme Court precedents.</p>
+          </div>
+          <span class="level-badge-tag">9-10 Points Autopilot</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Custom Animated Rocket / Explorer Cursor -->
+  <div class="rocket-cursor" id="rocket-cursor">
+    <svg class="rocket-body-svg" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M12 2.5C12 2.5 16 6 16 11C16 14.5 14.5 17 14.5 17L12 15.5L9.5 17C9.5 17 8 14.5 8 11C8 6 12 2.5 12 2.5Z" fill="#00f0ff" stroke="#ffffff" stroke-width="1.2"/>
+      <path d="M8 11L5 13L6 16.5L9.5 15" fill="#bd93f9" stroke="#ffffff" stroke-width="0.8"/>
+      <path d="M16 11L19 13L18 16.5L14.5 15" fill="#bd93f9" stroke="#ffffff" stroke-width="0.8"/>
+      <circle cx="12" cy="10" r="1.8" fill="#ffffff"/>
+      <!-- Animated Booster Flame -->
+      <path class="booster-flame" d="M10.5 16.5L12 21.5L13.5 16.5Z" fill="#ff79c6"/>
+    </svg>
   </div>
 
   <!-- Floating Edge Reopen Buttons -->

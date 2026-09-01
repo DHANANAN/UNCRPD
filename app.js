@@ -9,6 +9,7 @@ const state = {
   selected: null,
   tilt: 55,
   density: 1.0,
+  theme: localStorage.getItem('uncrpd_theme') || 'dark',
   
   // Guided Story Tour State
   tourActive: false,
@@ -21,7 +22,10 @@ const state = {
   // Sidebar Toggling & Sound State
   leftCollapsed: false,
   rightCollapsed: false,
-  voiceMuted: localStorage.getItem('uncrpd_voice_muted') === 'true'
+  voiceMuted: localStorage.getItem('uncrpd_voice_muted') === 'true',
+
+  // 5s Viewport Hover Zen Focus Mode State
+  zenActive: false
 };
 
 // Global Lookup Maps
@@ -585,6 +589,10 @@ function showArticleDetails(title) {
       </div>
       
       <p class="detail-description">${esc(a?.summary || 'Article section extracted from the UNCRPD India report.')}</p>
+      
+      <button class="btn btn-action btn-doc-highlight" style="margin-top: 12px; width: 100%; justify-content: center; display: flex; align-items: center; gap: 8px;" onclick="openInDocViewer('${esc(title)}')">
+        <span>📄 Open Chapter in Official Report Doc</span>
+      </button>
     </div>
     
     ${figuresHTML ? `
@@ -687,6 +695,10 @@ function showPointDetails(no) {
       <div class="bonsai-quote-card">
         ${esc(p.text)}
       </div>
+      
+      <button class="btn btn-action btn-doc-highlight" style="margin-top: 10px; width: 100%; justify-content: center; display: flex; align-items: center; gap: 8px;" onclick="openInDocViewer('Point ${p.no} - ${esc(p.article)}')">
+        <span>📄 Open Point in Official Report Doc</span>
+      </button>
     </div>
     
     ${directFigureHTML ? `
@@ -915,11 +927,14 @@ function initSearch() {
 }
 
 // Guided Story Tour Steps
-const tourSteps = [
+// =========================================================================
+// AMI 3-LEVEL STORY & AUTOPILOT TOUR DEFINITIONS
+// =========================================================================
+const tourLevel1Steps = [
   {
-    chapter: "Chapter 1/6: Overview Map",
-    title: "Ami's UNCRPD Interactive Tour!",
-    text: "Hello! I'm Ami, your rights guide guardian. I'll walk you through the key findings of the UNCRPD report for India. We are starting at the Overview Map showing the 31 articles of the report clustered around the central hub. Click Next to proceed!",
+    chapter: "Level 1 (1/4): 3D Constellation",
+    title: "India UNCRPD 3D Mind Map",
+    text: "Welcome to the India UNCRPD State Report! I'm Ami, your rights guide guardian. This central 3D cosmos maps all 31 Articles, numbered points, and legal citations into an interactive starlight constellation. Drag to tilt and rotate, or scroll to zoom!",
     expression: "happy",
     action: () => {
       state.selected = null;
@@ -929,56 +944,160 @@ const tourSteps = [
     }
   },
   {
-    chapter: "Chapter 2/6: Demographic Profile",
-    title: "Disability Population Split",
-    text: "Let's inspect the demographic data. According to Census 2011, India recorded 26.8 million persons with disabilities (2.21% of the total population). Look at the details panel on the right: it displays Figure 1 and Figure 2 which present the disability prevalence by source and rural-urban population split.",
+    chapter: "Level 1 (2/4): Modes & Clustering",
+    title: "Perspectives & Geometry Sliders",
+    text: "You can switch perspectives anytime: explore cross-cutting thematic hubs, browse footnote sources, or examine all points. Use the Tilt and Spread sliders on the left to customize the graph geometry for your screen!",
+    expression: "excited",
+    action: () => {
+      state.mode = 'themes';
+      triggerGraphRender();
+      graph3D.resetView();
+    }
+  },
+  {
+    chapter: "Level 1 (3/4): Real-time Search",
+    title: "Instant Legal Search & Filters",
+    text: "Type any case law (like 'Vikash Kumar'), statute ('RPwD Act'), or key phrase into the search box to jump directly to relevant report points and citations in real time!",
+    expression: "happy",
+    action: () => {
+      const searchInput = document.getElementById('search-input');
+      if (searchInput) searchInput.focus();
+    }
+  },
+  {
+    chapter: "Level 1 (4/4): Official In-Doc Viewer",
+    title: "Live Report Doc & Themes",
+    text: "Need to check the original submission? Click '📄 Report Doc' at the top to browse the official India UNCRPD state document directly inside the dashboard with chapter quick-jumps! You can also switch between Dark, Light, and Reading modes anytime.",
+    expression: "excited",
+    action: () => {
+      state.mode = 'overview';
+      triggerGraphRender();
+      graph3D.resetView();
+    }
+  }
+];
+
+const tourLevel2Steps = [
+  {
+    chapter: "Level 2 (1/4): Demographic Baseline",
+    title: "Point 3: Census Disability Profile",
+    text: "Let's begin our case study with the demographics. Census 2011 records 26.8 million persons with disabilities across India. In the right panel, Figure 1 and Figure 2 illustrate the disability type distribution and rural-urban population split.",
     expression: "excited",
     action: () => {
       selectPoint(3);
     }
   },
   {
-    chapter: "Chapter 3/6: Rights Act, 2016",
-    title: "Rights of Persons with Disabilities Act",
-    text: "Here we see the primary legislative milestone. The RPwD Act, 2016 came into force on April 19, 2017, aligning Indian domestic law with the UNCRPD. It expanded specified disability categories from 7 to 21, and raised government job reservations to 4%. Check out Figure 6 for details on these changes!",
+    chapter: "Level 2 (2/4): Universal Accessibility",
+    title: "Point 18: Sugamya Bharat Abhiyan",
+    text: "Under Article 9 (Accessibility), the Accessible India Campaign has retrofitted over 1,600 government buildings, major transit terminals, and public websites with national harmonized accessibility guidelines.",
     expression: "happy",
     action: () => {
-      selectPoint(8);
+      selectPoint(18);
     }
   },
   {
-    chapter: "Chapter 4/6: Universal Accessibility",
-    title: "Accessible India Campaign",
-    text: "Accessibility is vital. Under the Sugamya Bharat Abhiyan (Accessible India Campaign), over 1,600 government buildings, all major railway stations, and 71% of schools have been made barrier-free. You can review the built environment indicators in Figure 16 and digital accessibility frameworks in Figure 17.",
+    chapter: "Level 2 (3/4): Inclusive Education",
+    title: "Point 52: Samagra Shiksha Support",
+    text: "Under Article 24, India's Right to Education mandate provides barrier-free classrooms, individualized education plans, special educator allocations, and accessible digital learning resources for children with disabilities.",
     expression: "excited",
     action: () => {
-      selectArticle("Article 9: Accessibility");
+      selectPoint(52);
     }
   },
   {
-    chapter: "Chapter 5/6: Access to Justice",
-    title: "Landmark Judicial Precedents",
-    text: "The Supreme Court has played a critical role in enforcing rights. In Vikash Kumar, the Court granted scribes as a reasonable accommodation for non-benchmark disabilities. In Rajive Raturi, accessibility was affirmed as integral to the right to life. See Figure 21 and Figure 22 for equal recognition maps.",
-    expression: "thinking",
-    action: () => {
-      selectPoint(9);
-    }
-  },
-  {
-    chapter: "Chapter 6/6: Inclusive Education",
-    title: "Inclusive Education Support",
-    text: "Finally, let's explore Article 24 (Education). The right to education guarantees free, barrier-free schooling for children with disabilities, supported by pupil-teacher ratios and special allowances. Look at the comprehensive inclusive education ecosystem layout shown in Figure 40 on the right!",
+    chapter: "Level 2 (4/4): Employment Rights",
+    title: "Point 94: RPwD Act Statutory Quotas",
+    text: "Under Article 27, the RPwD Act 2016 mandates a 4% public sector employment reservation, incentivizes private sector hiring, and prohibits disability discrimination in job promotions and postings.",
     expression: "happy",
     action: () => {
-      selectArticle("Article 24 - Education");
+      selectPoint(94);
     }
   }
 ];
 
+const tourLevel3Steps = [
+  {
+    chapter: "Level 3 Autopilot (1/10): Core Principles",
+    title: "Point 1: Human Dignity & Inherent Worth",
+    text: "Autopilot engaged! Step 1 explores the foundational principles of the UNCRPD: individual autonomy, non-discrimination, full participation, and respect for difference across all statutory frameworks.",
+    expression: "happy",
+    action: () => selectPoint(1)
+  },
+  {
+    chapter: "Level 3 Autopilot (2/10): Reasonable Accommodation",
+    title: "Point 7: Article 5 Equality Mandate",
+    text: "Reasonable accommodation is recognized as a non-negotiable fundamental right. Denial of necessary modifications constitutes prohibited discrimination under Article 5.",
+    expression: "thinking",
+    action: () => selectPoint(7)
+  },
+  {
+    chapter: "Level 3 Autopilot (3/10): Women & Girls",
+    title: "Point 12: Article 6 Intersectional Protections",
+    text: "Addressing multiple vulnerabilities: dedicated institutional safeguards, reproductive healthcare access, and safety mechanisms for women and children with disabilities.",
+    expression: "excited",
+    action: () => selectPoint(12)
+  },
+  {
+    chapter: "Level 3 Autopilot (4/10): Infrastructure Audits",
+    title: "Point 18: Article 9 Built Environment Standards",
+    text: "Sugamya Bharat Abhiyan mandates comprehensive accessibility audits for physical infrastructure, public transport fleets, and government digital portals.",
+    expression: "happy",
+    action: () => selectPoint(18)
+  },
+  {
+    chapter: "Level 3 Autopilot (5/10): Legal Capacity",
+    title: "Point 31: Article 12 Supported Decision-Making",
+    text: "Reforming legal guardianship: shifting from plenary substituted guardianship to supported decision-making frameworks ensuring individual will and preferences are respected.",
+    expression: "thinking",
+    action: () => selectPoint(31)
+  },
+  {
+    chapter: "Level 3 Autopilot (6/10): Inclusive Curriculum",
+    title: "Point 52: Article 24 Early Childhood to Higher Ed",
+    text: "Universal access to education with Indian Sign Language (ISL) standardization, Braille textbook distribution, and specialized resource rooms across districts.",
+    expression: "excited",
+    action: () => selectPoint(52)
+  },
+  {
+    chapter: "Level 3 Autopilot (7/10): Employment Mandate",
+    title: "Point 68: Article 27 4% Public Sector Reservation",
+    text: "Ensuring economic independence through statutory public sector reservations and reasonable accommodation in workplace assessments.",
+    expression: "happy",
+    action: () => selectPoint(68)
+  },
+  {
+    chapter: "Level 3 Autopilot (8/10): Vocational Skills",
+    title: "Point 74: DEPwD Skill Development Programs",
+    text: "National Action Plan for Skill Development providing vocational certifications, assistive tech kits, and self-employment micro-credit support.",
+    expression: "excited",
+    action: () => selectPoint(74)
+  },
+  {
+    chapter: "Level 3 Autopilot (9/10): Landmark Judicial Precedents",
+    title: "Point 9: Vikash Kumar & Rajive Raturi Rulings",
+    text: "The Supreme Court in Vikash Kumar affirmed scribes as an essential accommodation for all disabilities, and in Rajive Raturi mandated time-bound national accessibility compliance.",
+    expression: "thinking",
+    action: () => selectPoint(9)
+  },
+  {
+    chapter: "Level 3 Autopilot (10/10): Disaggregated Data",
+    title: "Point 137: Article 31 Evidence-Based Policy",
+    text: "Concluding our research tour! Establishing national disability databases (UDID card ecosystem) to inform targeted welfare interventions and track international treaty compliance.",
+    expression: "happy",
+    action: () => selectPoint(137)
+  }
+];
+
+let activeTourSteps = tourLevel1Steps;
+let currentTourLevel = 1;
+let autopilotTimer = null;
 let typeTimer = null;
+
 function typeSpeechText(text, targetId = 'tour-step-text') {
   const container = document.getElementById(targetId);
   if (typeTimer) clearInterval(typeTimer);
+  if (!container) return;
   container.textContent = '';
   
   let i = 0;
@@ -989,7 +1108,7 @@ function typeSpeechText(text, targetId = 'tour-step-text') {
     } else {
       clearInterval(typeTimer);
     }
-  }, 14);
+  }, 12);
 }
 
 function updateMascotAvatar(expression, avatarId = 'mascot-avatar') {
@@ -998,43 +1117,88 @@ function updateMascotAvatar(expression, avatarId = 'mascot-avatar') {
 }
 
 function executeTourStep(index) {
-  if (index < 0 || index >= tourSteps.length) return;
+  if (index < 0 || index >= activeTourSteps.length) return;
   state.currentTourStep = index;
   
-  const step = tourSteps[index];
+  const step = activeTourSteps[index];
   
-  document.getElementById('tour-chapter-badge').textContent = step.chapter;
-  document.getElementById('tour-step-title').textContent = step.title;
+  const badgeEl = document.getElementById('tour-chapter-badge');
+  const titleEl = document.getElementById('tour-step-title');
+  if (badgeEl) badgeEl.textContent = step.chapter;
+  if (titleEl) titleEl.textContent = step.title;
+  
   typeSpeechText(step.text, 'tour-step-text');
   updateMascotAvatar(step.expression, 'mascot-avatar');
   
   step.action();
   speakAmi(step.text);
   
-  document.getElementById('tour-back-btn').disabled = (index === 0);
+  const backBtn = document.getElementById('tour-back-btn');
   const nextBtn = document.getElementById('tour-next-btn');
-  if (index === tourSteps.length - 1) {
-    nextBtn.textContent = 'Finish';
-  } else {
-    nextBtn.textContent = 'Next';
+  if (backBtn) backBtn.disabled = (index === 0);
+  if (nextBtn) {
+    if (index === activeTourSteps.length - 1) {
+      nextBtn.textContent = 'Finish';
+    } else {
+      nextBtn.textContent = 'Next';
+    }
+  }
+  
+  // Autopilot handling for Level 3
+  if (currentTourLevel === 3 && state.tourActive) {
+    if (autopilotTimer) clearTimeout(autopilotTimer);
+    if (index < activeTourSteps.length - 1) {
+      autopilotTimer = setTimeout(() => {
+        if (state.tourActive && currentTourLevel === 3) {
+          executeTourStep(index + 1);
+        }
+      }, 7000);
+    }
   }
   
   const speedlines = document.getElementById('tour-speedlines');
-  speedlines.style.animation = 'none';
-  void speedlines.offsetWidth;
-  speedlines.style.animation = 'speedlines-spin 25s linear infinite';
+  if (speedlines) {
+    speedlines.style.animation = 'none';
+    void speedlines.offsetWidth;
+    speedlines.style.animation = 'speedlines-spin 25s linear infinite';
+  }
+}
+
+function openTourLevelModal() {
+  const modal = document.getElementById('tour-level-modal');
+  if (modal) modal.classList.remove('hidden');
+}
+
+function closeTourLevelModal() {
+  const modal = document.getElementById('tour-level-modal');
+  if (modal) modal.classList.add('hidden');
+}
+
+function startTourLevel(level) {
+  closeTourLevelModal();
+  if (state.tutorialActive) exitHelpTutorial();
+  
+  currentTourLevel = level;
+  if (level === 1) activeTourSteps = tourLevel1Steps;
+  else if (level === 2) activeTourSteps = tourLevel2Steps;
+  else if (level === 3) activeTourSteps = tourLevel3Steps;
+  
+  state.tourActive = true;
+  const overlay = document.getElementById('story-tour-overlay');
+  if (overlay) overlay.classList.remove('hidden');
+  
+  executeTourStep(0);
 }
 
 function startStoryTour() {
-  if (state.tutorialActive) exitHelpTutorial();
-  state.tourActive = true;
-  document.getElementById('story-tour-overlay').classList.remove('hidden');
-  executeTourStep(0);
+  openTourLevelModal();
 }
 
 function exitStoryTour() {
   state.tourActive = false;
-  document.getElementById('story-tour-overlay').classList.add('hidden');
+  if (autopilotTimer) clearTimeout(autopilotTimer);
+  const overlay = document.getElementById('story-tour-overlay');
+  if (overlay) overlay.classList.add('hidden');
   if (typeTimer) clearInterval(typeTimer);
   if ('speechSynthesis' in window) window.speechSynthesis.cancel();
   graph3D.resetView();
@@ -1042,117 +1206,18 @@ function exitStoryTour() {
 }
 
 // DEDICATED HELP TUTORIAL WIDGET
-const helpTutorialSteps = [
-  {
-    badge: "Step 1/5: Interactive 3D Map",
-    title: "Control the 3D Mind Map",
-    text: "This central workspace renders the report nodes in WebGL. Left-click drag to rotate the network; scroll your mouse wheel to zoom in and out. Click any node to focus the camera and view its details!",
-    targetId: "threejs-wrapper",
-    expression: "happy",
-    action: () => {
-      graph3D.resetView();
-    }
-  },
-  {
-    badge: "Step 2/5: Graph Configuration",
-    title: "Toggle Perspectives & Filters",
-    text: "Use these toggles to switch between Overview clusters, cross-cutting Themes, citation Sources, or All Points. You can also filter by a specific chapter using the dropdown, or adjust tilt angles and node spacing with these sliders!",
-    targetId: "view-mode-widget",
-    expression: "excited",
-    action: () => {}
-  },
-  {
-    badge: "Step 3/5: Real-time Search",
-    title: "Locate Case Laws & Schemes",
-    text: "Type acts, case names (like 'Vikash Kumar'), or key terms here. Search results appear instantly in a list below: clicking any item focuses the 3D node and loads its full text!",
-    targetId: "search-box-widget",
-    expression: "happy",
-    action: () => {}
-  },
-  {
-    badge: "Step 4/5: Contextual Details",
-    title: "Read Detailed Text & Visuals",
-    text: "When you select a node, its details load here. Scroll down to read the full body paragraph text, check footnotes, or view embedded visual infographics! Click any image preview to expand it to fullscreen.",
-    targetId: "sidebar-right",
-    expression: "excited",
-    action: () => {}
-  },
-  {
-    badge: "Step 5/5: Light / Dark Toggle",
-    title: "Warm Sepia Graph Paper",
-    text: "Designed with comfort in mind: click this button to switch between the cosmic dark mode and the warm gold-sand graph paper light mode!",
-    targetId: "theme-toggle-btn",
-    expression: "happy",
-    action: () => {}
-  }
-];
-
-let tutTypeTimer = null;
-function executeHelpStep(index) {
-  if (index < 0 || index >= helpTutorialSteps.length) return;
-  state.currentTutorialStep = index;
-  
-  const step = helpTutorialSteps[index];
-  
-  // Highlight targeted element with spotlight backdrop cutout
-  const target = document.getElementById(step.targetId);
-  const spotlight = document.getElementById('tutorial-spotlight');
-  if (target) {
-    const rect = target.getBoundingClientRect();
-    spotlight.style.left = `${rect.left - 8}px`;
-    spotlight.style.top = `${rect.top - 8}px`;
-    spotlight.style.width = `${rect.width + 16}px`;
-    spotlight.style.height = `${rect.height + 16}px`;
-    // spotlight is display: block
-    spotlight.style.display = 'block';
-  } else {
-    spotlight.style.display = 'none';
-  }
-  
-  document.getElementById('tut-step-badge').textContent = step.badge;
-  document.getElementById('tut-step-title').textContent = step.title;
-  
-  // Typewriter speech bubbles
-  const textEl = document.getElementById('tut-step-text');
-  if (tutTypeTimer) clearInterval(tutTypeTimer);
-  textEl.textContent = '';
-  let i = 0;
-  tutTypeTimer = setInterval(() => {
-    if (i < step.text.length) {
-      textEl.textContent += step.text[i];
-      i++;
-    } else {
-      clearInterval(tutTypeTimer);
-    }
-  }, 14);
-  
-  updateMascotAvatar(step.expression, 'tutorial-mascot');
-  
-  step.action();
-  speakAmi(step.text);
-  
-  document.getElementById('tut-back-btn').disabled = (index === 0);
-  const nextBtn = document.getElementById('tut-next-btn');
-  if (index === helpTutorialSteps.length - 1) {
-    nextBtn.textContent = 'Finish';
-  } else {
-    nextBtn.textContent = 'Next';
-  }
-}
-
 function startHelpTutorial() {
-  if (state.tourActive) exitStoryTour();
-  state.tutorialActive = true;
-  document.getElementById('tutorial-overlay').classList.remove('hidden');
-  executeHelpStep(0);
+  openTourLevelModal();
 }
 
 function exitHelpTutorial() {
   state.tutorialActive = false;
-  document.getElementById('tutorial-overlay').classList.add('hidden');
-  if (tutTypeTimer) clearInterval(tutTypeTimer);
+  const overlay = document.getElementById('tutorial-overlay');
+  if (overlay) overlay.classList.add('hidden');
+  if (typeTimer) clearInterval(typeTimer);
   if ('speechSynthesis' in window) window.speechSynthesis.cancel();
-  document.getElementById('tutorial-spotlight').style.display = 'none';
+  const spotlight = document.getElementById('tutorial-spotlight');
+  if (spotlight) spotlight.style.display = 'none';
   graph3D.resetView();
 }
 
@@ -1239,6 +1304,8 @@ function bindUIEvents() {
   const reopenLeftBtn = document.getElementById('reopen-left-btn');
   const reopenRightBtn = document.getElementById('reopen-right-btn');
   const sidebarBackdrop = document.getElementById('sidebar-backdrop');
+  const appContainer = document.querySelector('.app-container');
+  const zenPill = document.getElementById('zen-focus-pill');
   
   function updateSidebarBackdrop() {
     const isMobileTablet = window.innerWidth <= 1024;
@@ -1308,25 +1375,222 @@ function bindUIEvents() {
 
   window.addEventListener('resize', updateSidebarBackdrop);
 
+  // =========================================================================
+  // 5-SECOND HOVER AUTO-ZEN FOCUS MODE
+  // =========================================================================
+  let zenHoverTimer = null;
+
+  function activateZenFocusMode() {
+    if (state.zenActive || state.tourActive || state.tutorialActive) return;
+    state.zenActive = true;
+    if (appContainer) appContainer.classList.add('zen-focus-mode');
+    if (zenPill) zenPill.classList.remove('hidden');
+    setTimeout(() => { if (window.graph3D) window.graph3D.resize(); }, 350);
+  }
+
+  function deactivateZenFocusMode() {
+    if (!state.zenActive) return;
+    state.zenActive = false;
+    if (appContainer) appContainer.classList.remove('zen-focus-mode');
+    if (zenPill) zenPill.classList.add('hidden');
+    if (zenHoverTimer) {
+      clearTimeout(zenHoverTimer);
+      zenHoverTimer = null;
+    }
+    setTimeout(() => { if (window.graph3D) window.graph3D.resize(); }, 350);
+  }
+
+  function resetZenHoverTimer() {
+    if (zenHoverTimer) clearTimeout(zenHoverTimer);
+    if (!state.zenActive && !state.tourActive && !state.tutorialActive) {
+      zenHoverTimer = setTimeout(() => {
+        activateZenFocusMode();
+      }, 5000); // 5 seconds of viewport interaction
+    }
+  }
+
+  function cancelZenHoverTimer() {
+    if (zenHoverTimer) {
+      clearTimeout(zenHoverTimer);
+      zenHoverTimer = null;
+    }
+  }
+
+  const viewportContainer = document.getElementById('viewport-container');
+  const threeCanvas = document.getElementById('threejs-canvas');
+  
+  if (viewportContainer) {
+    viewportContainer.addEventListener('pointerenter', () => {
+      resetZenHoverTimer();
+    });
+    
+    viewportContainer.addEventListener('pointermove', (e) => {
+      // If user moves towards the edges in Zen mode, restore sidebars
+      if (state.zenActive) {
+        if (e.clientX < 50 || e.clientX > window.innerWidth - 60) {
+          deactivateZenFocusMode();
+        }
+      } else {
+        // Reset 5s timer if not in zen mode
+        resetZenHoverTimer();
+      }
+    });
+
+    viewportContainer.addEventListener('pointerleave', () => {
+      cancelZenHoverTimer();
+    });
+  }
+
+  const zenExitBtn = document.getElementById('zen-exit-btn');
+  if (zenExitBtn) {
+    zenExitBtn.addEventListener('click', deactivateZenFocusMode);
+  }
+
+  // Restore on sidebar interaction or key press
+  sidebarLeft.addEventListener('pointerenter', deactivateZenFocusMode);
+  sidebarRight.addEventListener('pointerenter', () => {
+    // If in zen mode and user directly interacts with right panel, we keep translucency boosted via CSS hover
+  });
+
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      deactivateZenFocusMode();
+      closeInDocViewer();
+      closeImageModal();
+    }
+  });
+
+  // =========================================================================
+  // IN-DOC GOOGLE DRIVE REPORT VIEWER CONTROLLER
+  // =========================================================================
+  const indocModal = document.getElementById('indoc-modal');
+  const indocIframe = document.getElementById('indoc-iframe');
+  const indocSpinner = document.getElementById('indoc-spinner');
+  const indocContainer = document.querySelector('.indoc-modal-container');
+  const indocViewerBtn = document.getElementById('indoc-viewer-btn');
+  const closeIndocBtn = document.getElementById('close-indoc-btn');
+  const indocFullscreenBtn = document.getElementById('indoc-fullscreen-btn');
+  const DOC_PREVIEW_URL = 'https://drive.google.com/file/d/1y3Lsy7hITnZfzWgbRUCHY7v7wSIYlVsn/preview';
+
+  function openInDocViewer(sectionHint = '') {
+    if (!indocModal) return;
+    indocModal.classList.remove('hidden');
+    deactivateZenFocusMode();
+    
+    if (!indocIframe.src || indocIframe.src === '' || indocIframe.src === window.location.href) {
+      if (indocSpinner) indocSpinner.classList.remove('hidden');
+      indocIframe.src = DOC_PREVIEW_URL;
+      indocIframe.onload = () => {
+        if (indocSpinner) indocSpinner.classList.add('hidden');
+      };
+    } else {
+      if (indocSpinner) indocSpinner.classList.add('hidden');
+    }
+  }
+
+  function closeInDocViewer() {
+    if (!indocModal) return;
+    indocModal.classList.add('hidden');
+    if (indocContainer) indocContainer.classList.remove('fullscreen');
+  }
+
+  function toggleInDocFullscreen() {
+    if (indocContainer) {
+      const isFull = indocContainer.classList.toggle('fullscreen');
+      if (indocFullscreenBtn) {
+        indocFullscreenBtn.textContent = isFull ? '✕ Exit Fullscreen' : '⛶ Fullscreen';
+      }
+    }
+  }
+
+  if (indocViewerBtn) indocViewerBtn.addEventListener('click', () => openInDocViewer());
+  if (closeIndocBtn) closeIndocBtn.addEventListener('click', closeInDocViewer);
+  if (indocFullscreenBtn) indocFullscreenBtn.addEventListener('click', toggleInDocFullscreen);
+  
+  if (indocModal) {
+    indocModal.addEventListener('click', (e) => {
+      if (e.target === indocModal) closeInDocViewer();
+    });
+  }
+
+  // Quick jump chapter click handlers
+  document.querySelectorAll('.jump-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      document.querySelectorAll('.jump-chip').forEach(c => c.style.borderColor = '');
+      chip.style.borderColor = 'var(--accent-cyan)';
+    });
+  });
+
   // Mute Voice toggles
   document.getElementById('tour-voice-btn').addEventListener('click', toggleVoiceMute);
   document.getElementById('tut-voice-btn').addEventListener('click', toggleVoiceMute);
   updateVoiceMuteUI();
   
-  // Theme Switching Event Listener (Dark vs. Light mode toggle)
+  // =========================================================================
+  // 3-WAY THEME SWITCHER (Dark / Light / Reading-Friendly)
+  // =========================================================================
   const themeToggleBtn = document.getElementById('theme-toggle-btn');
-  themeToggleBtn.addEventListener('click', () => {
-    const isLight = document.body.classList.toggle('light-theme');
-    const newTheme = isLight ? 'light' : 'dark';
-    themeToggleBtn.textContent = isLight ? '🌙 Dark Mode' : '☀ Light Mode';
-    graph3D.setTheme(newTheme);
+  
+  function applyTheme(themeName) {
+    state.theme = themeName;
+    document.body.classList.remove('light-theme', 'reading-theme');
     
-    // Reposition spotlights if tutorial is active to recalculate backdrop alpha
+    if (themeName === 'reading') {
+      document.body.classList.add('reading-theme');
+      if (themeToggleBtn) themeToggleBtn.textContent = '📖 Reading Mode';
+    } else if (themeName === 'light') {
+      document.body.classList.add('light-theme');
+      if (themeToggleBtn) themeToggleBtn.textContent = '☀️ Light Mode';
+    } else {
+      // Dark Mode default
+      if (themeToggleBtn) themeToggleBtn.textContent = '🌙 Dark Mode';
+    }
+    
+    localStorage.setItem('uncrpd_theme', themeName);
+    if (window.graph3D) {
+      window.graph3D.setTheme(themeName);
+    }
+    
     if (state.tutorialActive) {
       executeHelpStep(state.currentTutorialStep);
     }
-  });
+  }
+
+  function cycleTheme() {
+    if (state.theme === 'dark') {
+      applyTheme('light');
+    } else if (state.theme === 'light') {
+      applyTheme('reading');
+    } else {
+      applyTheme('dark');
+    }
+  }
+
+  if (themeToggleBtn) {
+    themeToggleBtn.addEventListener('click', cycleTheme);
+  }
+
+  // Apply initial saved theme
+  applyTheme(state.theme);
   
+  // Tour Level Selector Modal actions
+  const closeTourLevelBtn = document.getElementById('close-tour-level-btn');
+  if (closeTourLevelBtn) closeTourLevelBtn.addEventListener('click', closeTourLevelModal);
+  
+  const tourLevelModal = document.getElementById('tour-level-modal');
+  if (tourLevelModal) {
+    tourLevelModal.addEventListener('click', (e) => {
+      if (e.target === tourLevelModal) closeTourLevelModal();
+    });
+  }
+
+  document.querySelectorAll('.level-option-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const level = parseInt(btn.dataset.level || '1');
+      startTourLevel(level);
+    });
+  });
+
   // Story Tour Button actions
   document.getElementById('start-tour-btn').addEventListener('click', startStoryTour);
   document.getElementById('tour-exit-btn').addEventListener('click', exitStoryTour);
@@ -1336,7 +1600,7 @@ function bindUIEvents() {
     }
   });
   document.getElementById('tour-next-btn').addEventListener('click', () => {
-    if (state.currentTourStep < tourSteps.length - 1) {
+    if (state.currentTourStep < activeTourSteps.length - 1) {
       executeTourStep(state.currentTourStep + 1);
     } else {
       exitStoryTour();
@@ -1345,19 +1609,6 @@ function bindUIEvents() {
   
   // Help Tutorial Button actions
   document.getElementById('help-tutorial-btn').addEventListener('click', startHelpTutorial);
-  document.getElementById('tut-exit-btn').addEventListener('click', exitHelpTutorial);
-  document.getElementById('tut-back-btn').addEventListener('click', () => {
-    if (state.currentTutorialStep > 0) {
-      executeHelpStep(state.currentTutorialStep - 1);
-    }
-  });
-  document.getElementById('tut-next-btn').addEventListener('click', () => {
-    if (state.currentTutorialStep < helpTutorialSteps.length - 1) {
-      executeHelpStep(state.currentTutorialStep + 1);
-    } else {
-      exitHelpTutorial();
-    }
-  });
   
   // Close modal
   document.getElementById('close-modal-btn').addEventListener('click', closeImageModal);
@@ -1376,6 +1627,136 @@ function bindUIEvents() {
   });
 }
 
+// =========================================================================
+// CUSTOM ANIMATED ROCKET CURSOR & STARDUST TRAIL
+// =========================================================================
+function initRocketCursor() {
+  const cursor = document.getElementById('rocket-cursor');
+  if (!cursor) return;
+
+  let mouseX = window.innerWidth / 2;
+  let mouseY = window.innerHeight / 2;
+  let cursorX = mouseX;
+  let cursorY = mouseY;
+  let lastParticleTime = 0;
+
+  window.addEventListener('mousemove', (e) => {
+    mouseX = e.clientX;
+    mouseY = e.clientY;
+
+    const now = Date.now();
+    // Spawn subtle stardust particles on movement
+    if (now - lastParticleTime > 60) {
+      lastParticleTime = now;
+      spawnStardustDot(mouseX, mouseY);
+    }
+  });
+
+  function renderCursor() {
+    cursorX += (mouseX - cursorX) * 0.35;
+    cursorY += (mouseY - cursorY) * 0.35;
+    cursor.style.left = `${cursorX}px`;
+    cursor.style.top = `${cursorY}px`;
+    requestAnimationFrame(renderCursor);
+  }
+  renderCursor();
+
+  // Hover detection for buttons, links, inputs, and 3D labels
+  const hoverSelector = 'button, a, input, select, .node-label-anchor, .glass-card, .level-option-btn, .search-hit-item, .jump-chip';
+  document.addEventListener('mouseover', (e) => {
+    if (e.target.closest(hoverSelector)) {
+      cursor.classList.add('hovering');
+    }
+  });
+  document.addEventListener('mouseout', (e) => {
+    if (e.target.closest(hoverSelector)) {
+      cursor.classList.remove('hovering');
+    }
+  });
+}
+
+function spawnStardustDot(x, y) {
+  const dot = document.createElement('div');
+  dot.className = 'stardust-trail-dot';
+  const size = 3 + Math.random() * 4;
+  dot.style.width = `${size}px`;
+  dot.style.height = `${size}px`;
+  dot.style.left = `${x - size / 2}px`;
+  dot.style.top = `${y - size / 2}px`;
+  dot.style.opacity = '0.9';
+  document.body.appendChild(dot);
+
+  setTimeout(() => {
+    dot.style.transform = `translate(${(Math.random() - 0.5) * 16}px, ${8 + Math.random() * 12}px) scale(0.2)`;
+    dot.style.opacity = '0';
+  }, 20);
+
+  setTimeout(() => {
+    dot.remove();
+  }, 450);
+}
+
+// =========================================================================
+// SPACE ANOMALIES & EASTER EGGS CONTROLLER
+// =========================================================================
+function initSpaceAnomalies() {
+  const anomaliesBtn = document.getElementById('anomalies-btn');
+  const anomalyActions = ['blackhole', 'solarflare', 'quake', 'meteor', 'probe'];
+  let anomalyIndex = 0;
+
+  function triggerNextAnomaly() {
+    const action = anomalyActions[anomalyIndex % anomalyActions.length];
+    anomalyIndex++;
+    
+    if (action === 'blackhole') {
+      if (window.graph3D) window.graph3D.triggerBlackHole((Math.random() - 0.5) * 200, (Math.random() - 0.5) * 150, 40);
+    } else if (action === 'solarflare') {
+      if (window.graph3D) window.graph3D.triggerSolarFlare();
+    } else if (action === 'quake') {
+      if (window.graph3D) window.graph3D.triggerCosmicQuake();
+    } else if (action === 'meteor') {
+      if (window.graph3D) window.graph3D.triggerMeteorShower();
+    } else if (action === 'probe') {
+      if (window.graph3D && DATA.points.length) {
+        const randPt = DATA.points[Math.floor(Math.random() * DATA.points.length)];
+        window.graph3D.setOrbitingRocket('point:' + randPt.no);
+      }
+    }
+  }
+
+  if (anomaliesBtn) {
+    anomaliesBtn.addEventListener('click', triggerNextAnomaly);
+  }
+
+  // Keyboard Shortcuts for Space Anomalies
+  window.addEventListener('keydown', (e) => {
+    // Ignore if typing in input
+    if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) return;
+    
+    if (e.key === 'b' || e.key === 'B') {
+      if (window.graph3D) window.graph3D.triggerBlackHole(0, 0, 50);
+    } else if (e.key === 's' || e.key === 'S') {
+      if (window.graph3D) window.graph3D.triggerSolarFlare();
+    } else if (e.key === 'q' || e.key === 'Q') {
+      if (window.graph3D) window.graph3D.triggerCosmicQuake();
+    } else if (e.key === 'm' || e.key === 'M') {
+      if (window.graph3D) window.graph3D.triggerMeteorShower();
+    } else if (e.key === 'r' || e.key === 'R') {
+      if (window.graph3D && DATA.points.length) {
+        const randPt = DATA.points[Math.floor(Math.random() * DATA.points.length)];
+        selectPoint(randPt.no);
+      }
+    }
+  });
+
+  // Ambient random anomalies every 50 seconds to keep cosmos alive!
+  setInterval(() => {
+    if (!document.hidden && !state.tourActive) {
+      triggerNextAnomaly();
+    }
+  }, 50000);
+}
+
 // App Initialization entry point
 window.addEventListener('DOMContentLoaded', () => {
   initDataIndexes();
@@ -1387,13 +1768,35 @@ window.addEventListener('DOMContentLoaded', () => {
     'threejs-wrapper',
     handleNodeSelection
   );
+
+  // Sync 3D theme with initial state
+  window.graph3D.setTheme(state.theme);
   
   triggerGraphRender();
   renderDefaultInspector();
   initSearch();
+  initRocketCursor();
+  initSpaceAnomalies();
 });
 
-// Expose open modal globally so it can be called from inline onclick attributes in details templates
+// Expose open modal and in-doc viewer globally so it can be called from inline onclick attributes
 window.openImageModal = openImageModal;
 window.selectPoint = selectPoint;
 window.showSourceDetails = showSourceDetails;
+window.openInDocViewer = (hint) => {
+  const indocModal = document.getElementById('indoc-modal');
+  const indocIframe = document.getElementById('indoc-iframe');
+  const indocSpinner = document.getElementById('indoc-spinner');
+  const DOC_PREVIEW_URL = 'https://drive.google.com/file/d/1y3Lsy7hITnZfzWgbRUCHY7v7wSIYlVsn/preview';
+  
+  if (indocModal) {
+    indocModal.classList.remove('hidden');
+    if (!indocIframe.src || indocIframe.src === '' || indocIframe.src === window.location.href) {
+      if (indocSpinner) indocSpinner.classList.remove('hidden');
+      indocIframe.src = DOC_PREVIEW_URL;
+      indocIframe.onload = () => {
+        if (indocSpinner) indocSpinner.classList.add('hidden');
+      };
+    }
+  }
+};
