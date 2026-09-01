@@ -2877,18 +2877,16 @@ body::before {
 
 /* Autopilot Mode Live Badge in Topbar */
 .autopilot-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 10px;
-  background: linear-gradient(135deg, rgba(255, 121, 198, 0.2), rgba(189, 147, 249, 0.3));
-  border: 1px solid rgba(255, 121, 198, 0.5);
-  border-radius: 999px;
-  font-size: 11px;
-  font-weight: 600;
-  color: #ff79c6;
+  animation: pulse-autopilot 2s infinite;
+}
+
+@keyframes pulse-autopilot {
+  0%, 100% { opacity: 0.85; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.04); }
+}
+
 /* ==========================================================================
-   IN-DOC GOOGLE DRIVE VIEWER & INBUILT TABLE OF CONTENTS MODAL
+   SIMPLE CLEAN IN-DOC GOOGLE DRIVE DOCUMENT VIEWER MODAL
    ========================================================================== */
 .indoc-modal-overlay {
   position: fixed;
@@ -2917,10 +2915,10 @@ body::before {
 }
 
 .indoc-modal-container {
-  width: 96vw;
-  max-width: 1440px;
-  height: 90vh;
-  max-height: 90vh;
+  width: 94vw;
+  max-width: 1360px;
+  height: 88vh;
+  max-height: 88vh;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -2941,7 +2939,7 @@ body::before {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 14px 20px;
+  padding: 12px 20px;
   border-bottom: 1px solid var(--card-border);
   background: rgba(255, 255, 255, 0.02);
   flex-shrink: 0;
@@ -2959,7 +2957,7 @@ body::before {
 
 .indoc-modal-title-group h3 {
   font-family: var(--font-display);
-  font-size: 17px;
+  font-size: 16px;
   font-weight: 700;
   color: var(--color-ink);
   margin: 0;
@@ -2984,244 +2982,12 @@ body::before {
   font-size: 12px;
 }
 
-.indoc-modal-body {
-  display: grid;
-  grid-template-columns: 360px 1fr;
-  height: 100%;
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow: hidden;
-  position: relative;
-  transition: grid-template-columns 0.3s ease;
-}
-
-.indoc-modal-body.toc-collapsed {
-  grid-template-columns: 0px 1fr;
-}
-
-/* Inbuilt TOC Sidebar */
-.indoc-toc-sidebar {
-  display: flex;
-  flex-direction: column;
-  border-right: 1px solid var(--card-border);
-  background: rgba(0, 0, 0, 0.2);
-  height: 100%;
-  min-height: 0;
-  overflow: hidden;
-  position: relative;
-}
-
-.light-theme .indoc-toc-sidebar, .reading-theme .indoc-toc-sidebar {
-  background: rgba(0, 0, 0, 0.02);
-}
-
-.indoc-toc-header {
-  padding: 14px;
-  border-bottom: 1px solid var(--card-border);
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  flex-shrink: 0;
-}
-
-.indoc-toc-title {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--color-ink);
-}
-
-.indoc-toc-count {
-  font-size: 11px;
-  color: var(--color-muted);
-  font-weight: normal;
-}
-
-.indoc-toc-search-wrap input {
-  width: 100%;
-  padding: 8px 12px;
-  font-size: 12px;
-  border-radius: var(--radius-sm);
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid var(--card-border);
-  color: var(--color-ink);
-  outline: none;
-  transition: border-color var(--transition-fast);
-}
-
-.indoc-toc-search-wrap input:focus {
-  border-color: var(--accent-cyan);
-}
-
-.indoc-toc-filter-pills {
-  display: flex;
-  gap: 6px;
-  overflow-x: auto;
-  padding-bottom: 2px;
-}
-
-.toc-filter-pill {
-  padding: 3px 8px;
-  font-size: 10px;
-  font-weight: 600;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid var(--card-border);
-  color: var(--color-muted);
-  cursor: pointer;
-  white-space: nowrap;
-  transition: all var(--transition-fast);
-}
-
-.toc-filter-pill.active, .toc-filter-pill:hover {
-  background: rgba(0, 240, 255, 0.15);
-  border-color: var(--accent-cyan);
-  color: var(--accent-cyan);
-}
-
-.indoc-toc-list {
-  flex: 1 1 auto;
-  overflow-y: auto;
-  padding: 10px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  min-height: 0;
-}
-
-.indoc-toc-item {
-  padding: 10px 12px;
-  border-radius: var(--radius-md);
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  cursor: pointer;
-  transition: all var(--transition-fast);
-}
-
-.indoc-toc-item:hover {
-  background: rgba(0, 240, 255, 0.07);
-  border-color: rgba(0, 240, 255, 0.3);
-  transform: translateX(2px);
-}
-
-.indoc-toc-item.active {
-  background: rgba(0, 240, 255, 0.12);
-  border-color: var(--accent-cyan);
-}
-
-.toc-item-top {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 4px;
-}
-
-.toc-item-title {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--color-ink);
-  line-height: 1.3;
-}
-
-.toc-item-badge {
-  font-size: 10px;
-  padding: 2px 6px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.08);
-  color: var(--color-muted);
-  white-space: nowrap;
-  margin-left: 6px;
-}
-
-.toc-item-summary {
-  font-size: 11px;
-  color: var(--color-muted);
-  line-height: 1.3;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-/* Inbuilt Section Excerpt / Detail Preview Drawer */
-.indoc-section-preview {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  max-height: 50%;
-  padding: 16px;
-  background: rgba(10, 16, 26, 0.96);
-  border-top: 2px solid var(--accent-cyan);
-  backdrop-filter: blur(14px);
-  z-index: 10;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.5);
-  overflow-y: auto;
-}
-
-.light-theme .indoc-section-preview, .reading-theme .indoc-section-preview {
-  background: rgba(254, 252, 248, 0.98);
-  border-top-color: #b45309;
-}
-
-.indoc-section-preview.hidden {
-  display: none;
-}
-
-.preview-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.preview-header h4 {
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--color-ink);
-  margin: 0;
-}
-
-.preview-close-btn {
-  background: none;
-  border: none;
-  color: var(--color-muted);
-  cursor: pointer;
-  font-size: 13px;
-}
-
-.preview-meta {
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--accent-cyan);
-}
-
-.reading-theme .preview-meta {
-  color: #b45309;
-}
-
-.preview-summary {
-  font-size: 12px;
-  color: var(--color-ink);
-  line-height: 1.4;
-}
-
-.preview-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 6px;
-}
-
-/* Iframe Viewer Container */
+/* Full-Width Document Viewer Frame */
 .indoc-iframe-wrapper {
   position: relative;
   width: 100%;
   height: 100%;
+  flex: 1 1 auto;
   min-height: 0;
   background: #111622;
 }
