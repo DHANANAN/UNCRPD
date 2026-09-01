@@ -286,18 +286,19 @@
     </div>
   </div>
 
-  <!-- Dedicated In-Doc Google Drive Report Viewer Modal -->
+  <!-- Dedicated In-Doc Google Drive Report Viewer Modal with Inbuilt Table of Contents -->
   <div class="indoc-modal-overlay hidden" id="indoc-modal">
     <div class="indoc-modal-container glass-card">
       <div class="indoc-modal-header">
         <div class="indoc-modal-title-group">
           <div class="indoc-icon">📄</div>
           <div>
-            <h3>India UNCRPD State Report</h3>
-            <span class="indoc-subtitle">Official UN First Country Submission Document</span>
+            <h3>India UNCRPD State Report Viewer</h3>
+            <span class="indoc-subtitle">Official State Submission Document & Inbuilt Interactive Index</span>
           </div>
         </div>
         <div class="indoc-modal-controls">
+          <button class="btn btn-action" id="indoc-toggle-toc-btn" title="Toggle Table of Contents Sidebar">📑 Toggle Index</button>
           <a href="https://drive.google.com/file/d/1y3Lsy7hITnZfzWgbRUCHY7v7wSIYlVsn/view?usp=sharing" target="_blank" rel="noopener noreferrer" class="btn btn-action btn-doc-ext" title="Open directly in Google Drive in a new tab">
             <span>Open in Drive</span> ↗
           </a>
@@ -306,24 +307,54 @@
         </div>
       </div>
       
-      <!-- Quick Chapter Jump Bar -->
-      <div class="indoc-quick-jump-bar" id="indoc-quick-jump">
-        <span class="jump-label">Quick Jump:</span>
-        <button class="jump-chip" data-title="Table of Contents">📑 Contents</button>
-        <button class="jump-chip" data-title="Article 1-4 General Principles">Art. 1-4 Principles</button>
-        <button class="jump-chip" data-title="Article 5 Equality and Non-Discrimination">Art. 5 Equality</button>
-        <button class="jump-chip" data-title="Article 9 Accessibility">Art. 9 Accessibility</button>
-        <button class="jump-chip" data-title="Article 24 Education">Art. 24 Education</button>
-        <button class="jump-chip" data-title="Article 27 Work and Employment">Art. 27 Employment</button>
-        <button class="jump-chip" data-title="Article 31 Statistics and Data Collection">Art. 31 Statistics</button>
-      </div>
-      
-      <div class="indoc-iframe-wrapper">
-        <div class="indoc-loading-spinner" id="indoc-spinner">
-          <div class="spinner"></div>
-          <span>Loading UNCRPD Report from Google Drive...</span>
+      <!-- Dual-Pane Body: Left Inbuilt TOC + Right Google PDF Viewer -->
+      <div class="indoc-modal-body" id="indoc-modal-body">
+        <!-- Inbuilt Table of Contents Sidebar -->
+        <div class="indoc-toc-sidebar" id="indoc-toc-sidebar">
+          <div class="indoc-toc-header">
+            <div class="indoc-toc-title">
+              <span>📑 Table of Contents</span>
+              <span class="indoc-toc-count" id="indoc-toc-count">31 Articles</span>
+            </div>
+            <div class="indoc-toc-search-wrap">
+              <input type="text" id="indoc-toc-search" placeholder="Search Chapters, Articles, Keywords..." />
+            </div>
+            <div class="indoc-toc-filter-pills" id="indoc-toc-filters">
+              <button class="toc-filter-pill active" data-filter="all">All</button>
+              <button class="toc-filter-pill" data-filter="legal">Legal</button>
+              <button class="toc-filter-pill" data-filter="rights">Rights</button>
+              <button class="toc-filter-pill" data-filter="access">Access</button>
+              <button class="toc-filter-pill" data-filter="edu-work">Edu/Work</button>
+            </div>
+          </div>
+          
+          <div class="indoc-toc-list" id="indoc-toc-list">
+            <!-- Dynamically populated from REPORT_DATA.articles -->
+          </div>
+
+          <!-- Active Section Detail / Excerpt Preview Drawer -->
+          <div class="indoc-section-preview hidden" id="indoc-section-preview">
+            <div class="preview-header">
+              <h4 id="preview-section-title">Article Summary</h4>
+              <button class="preview-close-btn" id="close-preview-btn">✕</button>
+            </div>
+            <div class="preview-meta" id="preview-section-meta">Points 1-34</div>
+            <p class="preview-summary" id="preview-section-summary"></p>
+            <div class="preview-actions">
+              <button class="btn btn-sm btn-tour-primary" id="preview-focus-3d-btn">🔭 Focus in 3D Galaxy</button>
+              <a href="https://drive.google.com/file/d/1y3Lsy7hITnZfzWgbRUCHY7v7wSIYlVsn/view?usp=sharing" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-action">View in Drive ↗</a>
+            </div>
+          </div>
         </div>
-        <iframe id="indoc-iframe" src="" title="India UNCRPD State Report Document Viewer" allow="fullscreen"></iframe>
+
+        <!-- Google Drive PDF Viewer Frame -->
+        <div class="indoc-iframe-wrapper">
+          <div class="indoc-loading-spinner" id="indoc-spinner">
+            <div class="spinner"></div>
+            <span>Loading UNCRPD Report from Google Drive...</span>
+          </div>
+          <iframe id="indoc-iframe" src="" title="India UNCRPD State Report Document Viewer" allow="fullscreen"></iframe>
+        </div>
       </div>
     </div>
   </div>

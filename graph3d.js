@@ -12,21 +12,22 @@ class UNCRPDGraph3D {
     
     this.theme = 'dark'; // Active theme state: 'dark' or 'light'
     
-    // Animation targets for smooth interpolation (Tweens)
-    this.cameraTarget = new THREE.Vector3(0, 0, 450);
-    this.cameraCurrent = new THREE.Vector3(0, 0, 700);
-    this.worldRotationTarget = { x: 0.4, y: 0.1 };
-    this.worldRotationCurrent = { x: 0.4, y: 0.1 };
-    this.panTarget = new THREE.Vector3(0, 0, 0);
-    this.panCurrent = new THREE.Vector3(0, 0, 0);
+    // Intuitive Spherical Orbit & Pan Camera System
+    this.target = new THREE.Vector3(0, 0, 0);
+    this.targetAnim = new THREE.Vector3(0, 0, 0);
+    this.spherical = { radius: 520, theta: 0.25, phi: 1.15 };
+    this.sphericalTarget = { radius: 520, theta: 0.25, phi: 1.15 };
     
-    // Zoom limits
-    this.zoomTarget = 1.0;
-    this.zoomCurrent = 0.8;
     this.densityScale = 1.0;
     
     // Interactivity
     this.selectedNodeId = null;
+    this.hoveredNodeId = null;
+    this.isDragging = false;
+    this.isPanning = false;
+    this.dragButton = 0;
+    this.previousMousePosition = { x: 0, y: 0 };
+    
     // Active laser particles running along lines
     this.laserParticles = [];
     
@@ -579,15 +580,26 @@ class UNCRPDGraph3D {
   }
   
   initEvents() {
-    // Pointer Drag to Rotate
+    // Prevent right-click context menu on canvas for smooth right-click panning
+    this.canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+
+    // Pointer Drag to Rotate (Left Button) or Pan (Right Button / Shift Key)
     this.canvas.addEventListener('pointerdown', (e) => {
-      this.isDragging = true;
+      this.dragButton = e.button;
+      if (e.button === 2 || e.shiftKey) {
+        this.isPanning = true;
+        this.isDragging = false;
+      } else {
+        this.isDragging = true;
+        this.isPanning = false;
+      }
+      this.dragStartPos = { x: e.clientX, y: e.clientY };
       this.previousMousePosition = { x: e.clientX, y: e.clientY };
       this.canvas.setPointerCapture(e.pointerId);
     });
     
     this.canvas.addEventListener('pointermove', (e) => {
-      if (!this.isDragging) {
+      if (!this.isDragging && !this.isPanning) {
         this.updateMouseCoords(e);
         this.checkHover();
         return;
@@ -596,37 +608,59 @@ class UNCRPDGraph3D {
       const deltaX = e.clientX - this.previousMousePosition.x;
       const deltaY = e.clientY - this.previousMousePosition.y;
       
-      this.worldRotationTarget.y += deltaX * 0.004;
-      this.worldRotationTarget.x += deltaY * 0.004;
-      
-      // Limit vertical tilt
-      this.worldRotationTarget.x = Math.max(0.1, Math.min(Math.PI / 2.2, this.worldRotationTarget.x));
+      if (this.isDragging) {
+        // Orbit Rotate around target
+        this.sphericalTarget.theta -= deltaX * 0.005;
+        this.sphericalTarget.phi -= deltaY * 0.005;
+        // Clamp elevation to prevent pole inversion
+        this.sphericalTarget.phi = Math.max(0.05, Math.min(Math.PI - 0.05, this.sphericalTarget.phi));
+      } else if (this.isPanning) {
+        // Pan Camera in view plane
+        const camDir = new THREE.Vector3().subVectors(this.target, this.camera.position).normalize();
+        const right = new THREE.Vector3().crossVectors(camDir, new THREE.Vector3(0, 1, 0)).normalize();
+        const up = new THREE.Vector3().crossVectors(right, camDir).normalize();
+        const panSpeed = this.sphericalTarget.radius * 0.0016;
+        
+        this.targetAnim.addScaledVector(right, -deltaX * panSpeed);
+        this.targetAnim.addScaledVector(up, deltaY * panSpeed);
+      }
       
       this.previousMousePosition = { x: e.clientX, y: e.clientY };
     });
     
     this.canvas.addEventListener('pointerup', (e) => {
+      const wasClick = this.dragStartPos &&
+        Math.abs(e.clientX - this.dragStartPos.x) < 4 &&
+        Math.abs(e.clientY - this.dragStartPos.y) < 4;
+      
       this.isDragging = false;
+      this.isPanning = false;
       this.canvas.releasePointerCapture(e.pointerId);
+      
+      if (wasClick && e.button === 0) {
+        this.updateMouseCoords(e);
+        this.handleClick(e);
+      }
     });
     
     this.canvas.addEventListener('pointercancel', (e) => {
       this.isDragging = false;
+      this.isPanning = false;
     });
     
-    // Mouse Wheel to Zoom
+    // Smooth Mouse Wheel to Zoom towards target
     this.canvas.addEventListener('wheel', (e) => {
       e.preventDefault();
-      const zoomFactor = e.deltaY > 0 ? 0.90 : 1.10;
-      this.zoomTarget = Math.max(0.4, Math.min(2.5, this.zoomTarget * zoomFactor));
+      const zoomFactor = e.deltaY > 0 ? 1.12 : 0.89;
+      this.sphericalTarget.radius = Math.max(120, Math.min(1500, this.sphericalTarget.radius * zoomFactor));
     }, { passive: false });
     
-    // Canvas Click Selection
-    this.canvas.addEventListener('click', (e) => {
-      this.updateMouseCoords(e);
-      this.handleClick(e);
+    // Double click to smoothly reset view to overview
+    this.canvas.addEventListener('dblclick', (e) => {
+      e.preventDefault();
+      this.resetView();
     });
-    
+
     // Window Resize Handling
     window.addEventListener('resize', () => {
       this.onWindowResize();
@@ -696,16 +730,15 @@ class UNCRPDGraph3D {
     
     const mesh = this.nodeMeshes.get(nodeId);
     if (mesh) {
-      const pos = mesh.position;
+      // Smoothly pan target to the selected node position
+      this.targetAnim.copy(mesh.position);
       
-      this.panTarget.copy(pos).multiplyScalar(-1);
-      
-      let zoomDist = 200;
-      if (mesh.userData.nodeData.type.includes('article')) zoomDist = 320;
+      let zoomDist = 220;
+      if (mesh.userData.nodeData.type.includes('article')) zoomDist = 300;
       if (mesh.userData.nodeData.type.includes('theme')) zoomDist = 260;
       
-      this.zoomTarget = 1.3;
-      this.cameraTarget.set(0, 0, zoomDist);
+      this.sphericalTarget.radius = zoomDist;
+      this.sphericalTarget.phi = 1.25;
       
       this.setOrbitingRocket(nodeId);
       
@@ -804,11 +837,10 @@ class UNCRPDGraph3D {
       this.graphGroup.remove(this.orbitingRocketGroup);
       this.orbitingRocketGroup = null;
     }
-    this.panTarget.set(0, 0, 0);
-    this.zoomTarget = 0.9;
-    this.cameraTarget.set(0, 0, 520);
-    this.worldRotationTarget.x = 0.4;
-    this.worldRotationTarget.y = 0.1;
+    this.targetAnim.set(0, 0, 0);
+    this.sphericalTarget.radius = 520;
+    this.sphericalTarget.theta = 0.25;
+    this.sphericalTarget.phi = 1.15;
     this.selectedNodeId = null;
     
     document.querySelectorAll('.node-label-anchor').forEach(el => {
@@ -967,20 +999,18 @@ class UNCRPDGraph3D {
       this.shakeIntensity *= 0.88;
     }
     
-    this.worldRotationCurrent.x += (this.worldRotationTarget.x - this.worldRotationCurrent.x) * 0.08;
-    this.worldRotationCurrent.y += (this.worldRotationTarget.y - this.worldRotationCurrent.y) * 0.08;
+    // Smooth Orbit & Pan Camera Interpolation
+    this.target.lerp(this.targetAnim, 0.08);
+    this.spherical.radius += (this.sphericalTarget.radius - this.spherical.radius) * 0.08;
+    this.spherical.theta += (this.sphericalTarget.theta - this.spherical.theta) * 0.08;
+    this.spherical.phi += (this.sphericalTarget.phi - this.spherical.phi) * 0.08;
     
-    this.graphGroup.rotation.x = this.worldRotationCurrent.x;
-    this.graphGroup.rotation.y = this.worldRotationCurrent.y;
-    
-    this.panCurrent.lerp(this.panTarget, 0.08);
-    this.graphGroup.position.copy(this.panCurrent);
-    
-    this.zoomCurrent += (this.zoomTarget - this.zoomCurrent) * 0.08;
-    this.cameraCurrent.lerp(this.cameraTarget, 0.08);
-    
-    this.camera.position.copy(this.cameraCurrent).multiplyScalar(1 / this.zoomCurrent);
-    this.camera.lookAt(0, 0, 0);
+    // Convert Spherical to Cartesian Camera Position centered on Target
+    const sinPhiRadius = Math.sin(this.spherical.phi) * this.spherical.radius;
+    this.camera.position.x = this.target.x + sinPhiRadius * Math.sin(this.spherical.theta);
+    this.camera.position.y = this.target.y + Math.cos(this.spherical.phi) * this.spherical.radius;
+    this.camera.position.z = this.target.z + sinPhiRadius * Math.cos(this.spherical.theta);
+    this.camera.lookAt(this.target);
     
     if (this.stars) {
       this.stars.rotation.y += 0.0003;

@@ -1447,11 +1447,6 @@ function bindUIEvents() {
   }
 
   // Restore on sidebar interaction or key press
-  sidebarLeft.addEventListener('pointerenter', deactivateZenFocusMode);
-  sidebarRight.addEventListener('pointerenter', () => {
-    // If in zen mode and user directly interacts with right panel, we keep translucency boosted via CSS hover
-  });
-
   window.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
       deactivateZenFocusMode();
@@ -1461,21 +1456,150 @@ function bindUIEvents() {
   });
 
   // =========================================================================
-  // IN-DOC GOOGLE DRIVE REPORT VIEWER CONTROLLER
+  // INBUILT TABLE OF CONTENTS & GOOGLE DRIVE VIEWER CONTROLLER
   // =========================================================================
   const indocModal = document.getElementById('indoc-modal');
   const indocIframe = document.getElementById('indoc-iframe');
   const indocSpinner = document.getElementById('indoc-spinner');
   const indocContainer = document.querySelector('.indoc-modal-container');
+  const indocBody = document.getElementById('indoc-modal-body');
   const indocViewerBtn = document.getElementById('indoc-viewer-btn');
   const closeIndocBtn = document.getElementById('close-indoc-btn');
   const indocFullscreenBtn = document.getElementById('indoc-fullscreen-btn');
+  const indocToggleTocBtn = document.getElementById('indoc-toggle-toc-btn');
+  const indocTocList = document.getElementById('indoc-toc-list');
+  const indocTocSearch = document.getElementById('indoc-toc-search');
+  const indocTocFilters = document.getElementById('indoc-toc-filters');
+  const indocSectionPreview = document.getElementById('indoc-section-preview');
+  const previewTitle = document.getElementById('preview-section-title');
+  const previewMeta = document.getElementById('preview-section-meta');
+  const previewSummary = document.getElementById('preview-section-summary');
+  const previewFocus3dBtn = document.getElementById('preview-focus-3d-btn');
+  const closePreviewBtn = document.getElementById('close-preview-btn');
   const DOC_PREVIEW_URL = 'https://drive.google.com/file/d/1y3Lsy7hITnZfzWgbRUCHY7v7wSIYlVsn/preview';
+
+  let currentTocFilter = 'all';
+  let activeTocArticle = null;
+
+  function renderTableOfContents(filterText = '', categoryFilter = 'all') {
+    if (!indocTocList || !DATA.articles) return;
+    indocTocList.innerHTML = '';
+
+    const q = (filterText || '').toLowerCase().trim();
+
+    const filteredArticles = DATA.articles.filter(art => {
+      // Category filtering
+      if (categoryFilter !== 'all') {
+        const titleL = art.title.toLowerCase();
+        const themesL = (art.themes || []).join(' ').toLowerCase();
+        if (categoryFilter === 'legal' && !titleL.includes('general') && !themesL.includes('legal') && !titleL.includes('1-4')) return false;
+        if (categoryFilter === 'rights' && !themesL.includes('equality') && !themesL.includes('women') && !themesL.includes('children') && !themesL.includes('justice')) return false;
+        if (categoryFilter === 'access' && !themesL.includes('accessibility') && !themesL.includes('mobility')) return false;
+        if (categoryFilter === 'edu-work' && !themesL.includes('education') && !themesL.includes('employment') && !themesL.includes('work')) return false;
+      }
+
+      if (!q) return true;
+      const matchTitle = art.title.toLowerCase().includes(q);
+      const matchSummary = (art.summary || '').toLowerCase().includes(q);
+      const matchThemes = (art.themes || []).some(t => t.toLowerCase().includes(q));
+      const matchPts = `points ${art.start}-${art.end}`.includes(q) || `${art.start}` === q || `${art.end}` === q;
+      return matchTitle || matchSummary || matchThemes || matchPts;
+    });
+
+    const countEl = document.getElementById('indoc-toc-count');
+    if (countEl) countEl.textContent = `${filteredArticles.length} of ${DATA.articles.length} Articles`;
+
+    if (filteredArticles.length === 0) {
+      indocTocList.innerHTML = `
+        <div style="padding: 20px; text-align: center; color: var(--color-muted); font-size: 12px;">
+          No articles match "${filterText}". Try another keyword!
+        </div>
+      `;
+      return;
+    }
+
+    filteredArticles.forEach(art => {
+      const item = document.createElement('div');
+      item.className = `indoc-toc-item ${activeTocArticle && activeTocArticle.id === art.id ? 'active' : ''}`;
+      item.innerHTML = `
+        <div class="toc-item-top">
+          <span class="toc-item-title">${art.title}</span>
+          <span class="toc-item-badge">Pts ${art.start}-${art.end} (${art.count})</span>
+        </div>
+        <div class="toc-item-summary">${art.summary || 'Click to view section excerpts and 3D constellation focus.'}</div>
+      `;
+
+      item.addEventListener('click', () => {
+        selectTocArticle(art);
+      });
+
+      indocTocList.appendChild(item);
+    });
+  }
+
+  function selectTocArticle(art) {
+    activeTocArticle = art;
+    document.querySelectorAll('.indoc-toc-item').forEach(el => el.classList.remove('active'));
+    
+    // Show Preview Drawer
+    if (indocSectionPreview) {
+      indocSectionPreview.classList.remove('hidden');
+      if (previewTitle) previewTitle.textContent = art.title;
+      if (previewMeta) previewMeta.textContent = `Paragraphs ${art.start} to ${art.end} • ${art.count} Points • Themes: ${(art.themes || []).join(', ')}`;
+      if (previewSummary) previewSummary.textContent = art.summary;
+      
+      if (previewFocus3dBtn) {
+        previewFocus3dBtn.onclick = () => {
+          closeInDocViewer();
+          if (window.graph3D) {
+            window.graph3D.selectNode(art.id);
+          }
+        };
+      }
+    }
+  }
+
+  if (indocTocSearch) {
+    indocTocSearch.addEventListener('input', (e) => {
+      renderTableOfContents(e.target.value, currentTocFilter);
+    });
+  }
+
+  if (indocTocFilters) {
+    indocTocFilters.querySelectorAll('.toc-filter-pill').forEach(pill => {
+      pill.addEventListener('click', () => {
+        indocTocFilters.querySelectorAll('.toc-filter-pill').forEach(p => p.classList.remove('active'));
+        pill.classList.add('active');
+        currentTocFilter = pill.dataset.filter || 'all';
+        renderTableOfContents(indocTocSearch ? indocTocSearch.value : '', currentTocFilter);
+      });
+    });
+  }
+
+  if (closePreviewBtn && indocSectionPreview) {
+    closePreviewBtn.addEventListener('click', () => {
+      indocSectionPreview.classList.add('hidden');
+    });
+  }
+
+  if (indocToggleTocBtn && indocBody) {
+    indocToggleTocBtn.addEventListener('click', () => {
+      indocBody.classList.toggle('toc-collapsed');
+    });
+  }
 
   function openInDocViewer(sectionHint = '') {
     if (!indocModal) return;
     indocModal.classList.remove('hidden');
     deactivateZenFocusMode();
+    renderTableOfContents(indocTocSearch ? indocTocSearch.value : '', currentTocFilter);
+    
+    if (sectionHint) {
+      const targetArt = DATA.articles.find(a => a.id === sectionHint || a.title.toLowerCase().includes(sectionHint.toLowerCase()));
+      if (targetArt) {
+        selectTocArticle(targetArt);
+      }
+    }
     
     if (!indocIframe.src || indocIframe.src === '' || indocIframe.src === window.location.href) {
       if (indocSpinner) indocSpinner.classList.remove('hidden');
@@ -1512,14 +1636,6 @@ function bindUIEvents() {
       if (e.target === indocModal) closeInDocViewer();
     });
   }
-
-  // Quick jump chapter click handlers
-  document.querySelectorAll('.jump-chip').forEach(chip => {
-    chip.addEventListener('click', () => {
-      document.querySelectorAll('.jump-chip').forEach(c => c.style.borderColor = '');
-      chip.style.borderColor = 'var(--accent-cyan)';
-    });
-  });
 
   // Mute Voice toggles
   document.getElementById('tour-voice-btn').addEventListener('click', toggleVoiceMute);
