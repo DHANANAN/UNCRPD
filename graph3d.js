@@ -10,7 +10,7 @@ class UNCRPDGraph3D {
     this.nodeMeshes = new Map();
     this.linkLabelMeshes = [];
     
-    this.theme = 'dark'; // Active theme state: 'dark' or 'light'
+    this.theme = 'dark'; // Active theme state: 'dark', 'light', or 'reading'
     
     // Intuitive Spherical Orbit & Pan Camera System
     this.target = new THREE.Vector3(0, 0, 0);
@@ -26,10 +26,12 @@ class UNCRPDGraph3D {
     this.isDragging = false;
     this.isPanning = false;
     this.dragButton = 0;
+    this.dragStartPos = { x: 0, y: 0 };
     this.previousMousePosition = { x: 0, y: 0 };
     
     // Active laser particles running along lines
     this.laserParticles = [];
+    this.particleMeshes = [];
     
     // Space Anomalies (Black holes, Solar flares, Meteors, Cosmic quakes)
     this.blackHoles = [];
@@ -40,6 +42,8 @@ class UNCRPDGraph3D {
     // Supplemental Cosmic Rockets System
     this.spaceShips = [];
     this.orbitingRocketGroup = null;
+    this.orbitingRocketProbe = null;
+    this.orbitAngle = 0;
     
     this.initThree();
     this.initEvents();
@@ -48,16 +52,22 @@ class UNCRPDGraph3D {
   }
   
   initThree() {
-    const width = this.wrapper.clientWidth;
-    const height = this.wrapper.clientHeight;
+    const width = this.wrapper.clientWidth || this.wrapper.offsetWidth || window.innerWidth || 800;
+    const height = this.wrapper.clientHeight || this.wrapper.offsetHeight || window.innerHeight || 600;
     
     // Create Scene
     this.scene = new THREE.Scene();
     this.scene.fog = new THREE.FogExp2(0x030712, 0.0009);
     
-    // Create Camera
+    // Create Camera with Spherical initial position
     this.camera = new THREE.PerspectiveCamera(50, width / height, 1, 3200);
-    this.camera.position.copy(this.cameraCurrent);
+    const sinPhiRadius = Math.sin(this.spherical.phi) * this.spherical.radius;
+    this.camera.position.set(
+      this.target.x + sinPhiRadius * Math.sin(this.spherical.theta),
+      this.target.y + Math.cos(this.spherical.phi) * this.spherical.radius,
+      this.target.z + sinPhiRadius * Math.cos(this.spherical.theta)
+    );
+    this.camera.lookAt(this.target);
     
     // Create WebGL Renderer
     this.renderer = new THREE.WebGLRenderer({
@@ -183,68 +193,6 @@ class UNCRPDGraph3D {
     this.scene.add(this.stars);
   }
   
-  initEvents() {
-    // Pointer Drag to Rotate
-    this.canvas.addEventListener('pointerdown', (e) => {
-      this.isDragging = true;
-      this.previousMousePosition = { x: e.clientX, y: e.clientY };
-      this.canvas.setPointerCapture(e.pointerId);
-    });
-    
-    this.canvas.addEventListener('pointermove', (e) => {
-      if (!this.isDragging) {
-        this.updateMouseCoords(e);
-        this.checkHover();
-        return;
-      }
-      
-      const deltaX = e.clientX - this.previousMousePosition.x;
-      const deltaY = e.clientY - this.previousMousePosition.y;
-      
-      this.worldRotationTarget.y += deltaX * 0.004;
-      this.worldRotationTarget.x += deltaY * 0.004;
-      
-      // Limit vertical tilt
-      this.worldRotationTarget.x = Math.max(0.1, Math.min(Math.PI / 2.2, this.worldRotationTarget.x));
-      
-      this.previousMousePosition = { x: e.clientX, y: e.clientY };
-    });
-    
-    this.canvas.addEventListener('pointerup', (e) => {
-      this.isDragging = false;
-      this.canvas.releasePointerCapture(e.pointerId);
-      
-      const deltaX = Math.abs(e.clientX - this.previousMousePosition.x);
-      const deltaY = Math.abs(e.clientY - this.previousMousePosition.y);
-      if (deltaX < 3 && deltaY < 3) {
-        this.handleClick(e);
-      }
-    });
-    
-    // Scroll Wheel to Zoom
-    this.canvas.addEventListener('wheel', (e) => {
-      e.preventDefault();
-      const zoomAmount = e.deltaY > 0 ? 0.9 : 1.1;
-      this.zoomTarget = Math.max(0.3, Math.min(2.5, this.zoomTarget * zoomAmount));
-    }, { passive: false });
-    
-    window.addEventListener('resize', () => this.resize());
-  }
-  
-  updateMouseCoords(e) {
-    const rect = this.canvas.getBoundingClientRect();
-    this.mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-    this.mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
-  }
-  
-  resize() {
-    const width = this.wrapper.clientWidth;
-    const height = this.wrapper.clientHeight;
-    this.camera.aspect = width / height;
-    this.camera.updateProjectionMatrix();
-    this.renderer.setSize(width, height);
-  }
-  
   setData(nodes, links) {
     this.nodes = nodes;
     this.links = links;
@@ -257,8 +205,8 @@ class UNCRPDGraph3D {
   }
   
   setTilt(tiltDegrees) {
-    const rad = (tiltDegrees * Math.PI) / 180;
-    this.worldRotationTarget.x = rad;
+    const phi = ((90 - Math.max(10, Math.min(85, tiltDegrees))) * Math.PI) / 180;
+    this.sphericalTarget.phi = Math.max(0.05, Math.min(Math.PI - 0.05, phi));
   }
   
   setTheme(themeName) {
@@ -392,7 +340,7 @@ class UNCRPDGraph3D {
       
       const mesh = new THREE.Mesh(geom, material);
       mesh.scale.set(size, size, size);
-      mesh.position.set(node.x, node.y, node.z || 0);
+      mesh.position.set(node.x * this.densityScale, node.y * this.densityScale, (node.z || 0) * this.densityScale);
       mesh.userData = { nodeId: node.id, nodeData: node };
       
       this.graphGroup.add(mesh);
@@ -467,6 +415,71 @@ class UNCRPDGraph3D {
         this.createLaserParticle(fromMesh.position, toMesh.position, link.type);
       }
     });
+
+    // 3. Render Concentric Celestial Radius Rings & Cluster Orbit Guides (Fixes Radius Not Showing)
+    const radiusRings = [];
+    const isOverview = this.nodes.some(n => n.id === 'center') && this.nodes.some(n => n.type === 'article');
+    const isThemes = this.nodes.some(n => n.type === 'theme');
+    const isSources = this.nodes.some(n => n.type === 'source');
+    const isArticleExpanded = this.nodes.some(n => n.type === 'article center');
+
+    // Concentric celestial radar guide rings centered at (0, 0, 0)
+    if (isOverview) {
+      radiusRings.push({ radius: 520 * this.densityScale, center: new THREE.Vector3(0, 0, 10), opacity: 0.38, color: isReading ? 0xb45309 : (isLight ? 0xc4943c : 0x00f0ff) });
+      radiusRings.push({ radius: 260 * this.densityScale, center: new THREE.Vector3(0, 0, 20), opacity: 0.20, color: 0xcbd5e1 });
+      radiusRings.push({ radius: 780 * this.densityScale, center: new THREE.Vector3(0, 0, 0), opacity: 0.15, color: 0xbd93f9 });
+    } else if (isThemes) {
+      radiusRings.push({ radius: 470 * this.densityScale, center: new THREE.Vector3(0, 0, 10), opacity: 0.35, color: isReading ? 0xc2410c : (isLight ? 0xb37d14 : 0xffb86c) });
+      this.nodes.filter(n => n.type === 'theme').forEach(tn => {
+        radiusRings.push({
+          radius: 95 * this.densityScale,
+          center: new THREE.Vector3(tn.x * this.densityScale, tn.y * this.densityScale, (tn.z || 0) * this.densityScale),
+          opacity: 0.28,
+          color: 0xc4b5fd
+        });
+      });
+    } else if (isSources) {
+      radiusRings.push({ radius: 360 * this.densityScale, center: new THREE.Vector3(0, 0, 10), opacity: 0.35, color: isReading ? 0xbe123c : (isLight ? 0xd81b60 : 0xff79c6) });
+      this.nodes.filter(n => n.type === 'source' && n.id.startsWith('stype:')).forEach(sn => {
+        radiusRings.push({
+          radius: 140 * this.densityScale,
+          center: new THREE.Vector3(sn.x * this.densityScale, sn.y * this.densityScale, (sn.z || 0) * this.densityScale),
+          opacity: 0.28,
+          color: 0xd8b4fe
+        });
+      });
+    } else if (isArticleExpanded) {
+      radiusRings.push({ radius: 380 * this.densityScale, center: new THREE.Vector3(0, 0, 10), opacity: 0.40, color: isReading ? 0xb45309 : (isLight ? 0xc4943c : 0x00f0ff) });
+      radiusRings.push({ radius: 190 * this.densityScale, center: new THREE.Vector3(0, 0, 20), opacity: 0.22, color: 0xcbd5e1 });
+    } else {
+      // General subtle concentric rings for All Points & Other layouts
+      [180, 360, 540, 720].forEach(r => {
+        radiusRings.push({ radius: r * this.densityScale, center: new THREE.Vector3(0, 0, 0), opacity: 0.18, color: 0x94a3b8 });
+      });
+    }
+
+    // Build the 3D ring geometries
+    radiusRings.forEach(ring => {
+      const segments = 128;
+      const ringPoints = [];
+      for (let i = 0; i <= segments; i++) {
+        const theta = (i / segments) * Math.PI * 2;
+        ringPoints.push(new THREE.Vector3(
+          ring.center.x + Math.cos(theta) * ring.radius,
+          ring.center.y + Math.sin(theta) * ring.radius,
+          ring.center.z
+        ));
+      }
+      const ringGeom = new THREE.BufferGeometry().setFromPoints(ringPoints);
+      const ringMat = new THREE.LineBasicMaterial({
+        color: ring.color || 0x00f0ff,
+        transparent: true,
+        opacity: (isLight || isReading) ? ring.opacity * 0.75 : ring.opacity,
+        blending: (isLight || isReading) ? THREE.NormalBlending : THREE.AdditiveBlending
+      });
+      const ringMesh = new THREE.Line(ringGeom, ringMat);
+      this.graphGroup.add(ringMesh);
+    });
     
     this.buildHTMLLabels();
   }
@@ -507,13 +520,7 @@ class UNCRPDGraph3D {
   }
   
   repositionNodes() {
-    this.nodeMeshes.forEach((mesh, id) => {
-      const node = this.nodes.find(n => n.id === id);
-      if (node) {
-        mesh.position.set(node.x * this.densityScale, node.y * this.densityScale, (node.z || 0) * this.densityScale);
-      }
-    });
-    this.buildGraph(); // Update connection coordinates
+    this.buildGraph(); // Recomputes all node positions and radius rings with new densityScale
   }
   
   buildHTMLLabels() {
@@ -553,30 +560,6 @@ class UNCRPDGraph3D {
         position: new THREE.Vector3(node.x * this.densityScale, node.y * this.densityScale, (node.z || 0) * this.densityScale)
       });
     });
-  }
-  
-  checkHover() {
-    this.raycaster.setFromCamera(this.mouse, this.camera);
-    const meshes = Array.from(this.nodeMeshes.values());
-    const intersects = this.raycaster.intersectObjects(meshes);
-    
-    if (intersects.length > 0) {
-      const mesh = intersects[0].object;
-      const nodeId = mesh.userData.nodeId;
-      if (this.hoveredNodeId !== nodeId) {
-        this.hoveredNodeId = nodeId;
-        document.querySelectorAll('.node-label-anchor').forEach(el => {
-          el.classList.toggle('hovered', el.dataset.id === nodeId);
-        });
-      }
-    } else {
-      if (this.hoveredNodeId !== null) {
-        this.hoveredNodeId = null;
-        document.querySelectorAll('.node-label-anchor').forEach(el => {
-          el.classList.remove('hovered');
-        });
-      }
-    }
   }
   
   initEvents() {
@@ -643,7 +626,7 @@ class UNCRPDGraph3D {
       }
     });
     
-    this.canvas.addEventListener('pointercancel', (e) => {
+    this.canvas.addEventListener('pointercancel', () => {
       this.isDragging = false;
       this.isPanning = false;
     });
@@ -683,6 +666,10 @@ class UNCRPDGraph3D {
       this.renderer.setSize(width, height);
       this.updateProjectedLabels();
     }
+  }
+
+  resize() {
+    this.onWindowResize();
   }
 
   checkHover() {
@@ -734,8 +721,10 @@ class UNCRPDGraph3D {
       this.targetAnim.copy(mesh.position);
       
       let zoomDist = 220;
-      if (mesh.userData.nodeData.type.includes('article')) zoomDist = 300;
-      if (mesh.userData.nodeData.type.includes('theme')) zoomDist = 260;
+      if (mesh.userData.nodeData && mesh.userData.nodeData.type) {
+        if (mesh.userData.nodeData.type.includes('article')) zoomDist = 300;
+        if (mesh.userData.nodeData.type.includes('theme')) zoomDist = 260;
+      }
       
       this.sphericalTarget.radius = zoomDist;
       this.sphericalTarget.phi = 1.25;
@@ -795,6 +784,7 @@ class UNCRPDGraph3D {
   setOrbitingRocket(nodeId) {
     if (this.orbitingRocketGroup) {
       this.graphGroup.remove(this.orbitingRocketGroup);
+      this.orbitingRocketGroup = null;
     }
     
     const nodeMesh = this.nodeMeshes.get(nodeId);
@@ -802,30 +792,32 @@ class UNCRPDGraph3D {
     
     this.orbitingRocketGroup = new THREE.Group();
     
-    // Orbital path visualizer ring
-    const ringGeom = new THREE.RingGeometry(20, 21, 32);
-    const ringMat = new THREE.MeshBasicMaterial({
+    // Create Mini Rocket Probe
+    const probe = new THREE.Group();
+    const bodyGeom = new THREE.ConeGeometry(1.4, 4.8, 6);
+    const bodyMat = new THREE.MeshPhongMaterial({
       color: 0x00f0ff,
-      transparent: true,
-      opacity: 0.35,
-      side: THREE.DoubleSide,
-      blending: THREE.AdditiveBlending
-    });
-    const ringMesh = new THREE.Mesh(ringGeom, ringMat);
-    ringMesh.rotation.x = Math.PI / 3;
-    this.orbitingRocketGroup.add(ringMesh);
-    
-    // Mini Orbiting Lander Probe
-    const probeGeom = new THREE.ConeGeometry(1.5, 4.5, 6);
-    const probeMat = new THREE.MeshPhongMaterial({
-      color: 0xffffff,
-      emissive: 0x00f0ff,
+      emissive: 0x004466,
       shininess: 90
     });
-    const probeMesh = new THREE.Mesh(probeGeom, probeMat);
-    probeMesh.rotation.x = Math.PI / 2;
-    this.orbitingRocketProbe = probeMesh;
-    this.orbitingRocketGroup.add(probeMesh);
+    const bodyMesh = new THREE.Mesh(bodyGeom, bodyMat);
+    bodyMesh.rotation.x = Math.PI / 2;
+    probe.add(bodyMesh);
+    
+    const flameGeom = new THREE.ConeGeometry(0.8, 2.2, 6);
+    const flameMat = new THREE.MeshBasicMaterial({
+      color: 0xffaa00,
+      transparent: true,
+      opacity: 0.9,
+      blending: THREE.AdditiveBlending
+    });
+    const flameMesh = new THREE.Mesh(flameGeom, flameMat);
+    flameMesh.rotation.x = -Math.PI / 2;
+    flameMesh.position.z = -3.0;
+    probe.add(flameMesh);
+    
+    this.orbitingRocketProbe = probe;
+    this.orbitingRocketGroup.add(probe);
     
     this.orbitingRocketGroup.position.copy(nodeMesh.position);
     this.graphGroup.add(this.orbitingRocketGroup);
@@ -849,7 +841,7 @@ class UNCRPDGraph3D {
   }
   
   updateProjectedLabels() {
-    if (!this.linkLabelMeshes.length) return;
+    if (!this.linkLabelMeshes || !this.linkLabelMeshes.length) return;
     
     const width = this.wrapper.clientWidth || this.wrapper.offsetWidth || window.innerWidth;
     const height = this.wrapper.clientHeight || this.wrapper.offsetHeight || window.innerHeight;
@@ -859,39 +851,28 @@ class UNCRPDGraph3D {
     
     this.linkLabelMeshes.forEach(item => {
       tempV.copy(item.position);
-      tempV.applyMatrix4(this.graphGroup.matrixWorld);
       tempV.project(this.camera);
       
-      if (tempV.z > 1) {
+      if (tempV.z < 1) {
+        const x = (tempV.x * widthHalf) + widthHalf;
+        const y = -(tempV.y * heightHalf) + heightHalf;
+        
+        item.element.style.display = 'block';
+        item.element.style.left = `${x}px`;
+        item.element.style.top = `${y}px`;
+        
+        const dist = this.camera.position.distanceTo(item.position);
+        const maxDist = 950;
+        const opacity = Math.max(0.15, Math.min(1.0, 1.25 - (dist / maxDist)));
+        item.element.style.opacity = opacity.toFixed(2);
+      } else {
         item.element.style.display = 'none';
-        return;
       }
-      
-      const x = (tempV.x * widthHalf) + widthHalf;
-      const y = -(tempV.y * heightHalf) + heightHalf;
-      
-      item.element.style.display = 'block';
-      item.element.style.left = `${x}px`;
-      item.element.style.top = `${y}px`;
-      
-      const zIndex = Math.round((1 - tempV.z) * 1000);
-      item.element.style.zIndex = `${zIndex}`;
-      
-      const scale = Math.max(0.65, Math.min(1.15, 1 - (tempV.z * 0.5)));
-      item.element.style.transform = `translate(-50%, -50%) scale(${scale})`;
-      item.element.style.opacity = Math.max(0.2, 1.2 - tempV.z);
     });
   }
 
   triggerCosmicQuake() {
-    this.shakeIntensity = 24.0;
-    const overlay = document.querySelector('.app-container');
-    if (overlay) {
-      overlay.classList.remove('cosmic-quake-active');
-      void overlay.offsetWidth;
-      overlay.classList.add('cosmic-quake-active');
-      setTimeout(() => overlay.classList.remove('cosmic-quake-active'), 900);
-    }
+    this.shakeIntensity = 18.0;
   }
 
   triggerSolarFlare() {
@@ -1134,7 +1115,7 @@ class UNCRPDGraph3D {
       
       const mesh = new THREE.Mesh(geom, mat);
       mesh.scale.set(currentSize, currentSize, currentSize);
-      mesh.position.copy(lp.position).multiplyScalar(this.densityScale);
+      mesh.position.copy(lp.position);
       
       this.graphGroup.add(mesh);
       this.particleMeshes.push(mesh);
